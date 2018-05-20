@@ -12,9 +12,9 @@ namespace Producer
 
     public class Program
     {        
-        private const string EventHubConnectionString = "Event Hubs connection string";
+        private const string EventHubConnectionString = "Endpoint=sb://demonamespaceeh.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=+QG31wAUl4E0NF3CdGHyaq+h1qF7uyuGe1I8eBD9lVk=";
 
-        private const string EventHubName = "Event Hub name";
+        private const string EventHubName = "demoanomaliedetection";
 
         private const string TransactionsDumpFile = "mocktransactions.csv";
 
@@ -37,13 +37,16 @@ namespace Producer
 
             eventHubClient = EventHubClient.CreateFromConnectionString(connectionStringBuilder.ToString());
 
-            await SendMessagesToEventHubAsync(1000);
+            while(true)
+            {
+                await SendMessagesToEventHubAsync(10000);
 
-            await eventHubClient.CloseAsync();
+                await eventHubClient.CloseAsync();
 
-            Console.WriteLine("Press [enter] to exit.");
-            Console.ReadLine();
-
+                Console.WriteLine("Press [enter] to exit.");
+                Console.ReadLine();
+            }
+            
             return 0;
         }
 

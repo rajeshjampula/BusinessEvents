@@ -14,6 +14,8 @@ namespace Producer
         public string Location { get; set; }
 
         public DateTimeOffset Timestamp { get; set; }
+
+        public string Email { get; set; }
     }
 }
 
