@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SBthroughputTest", "SBthrou
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SimpleSBsendReceive", "SimpleSBsendReceive\SimpleSBsendReceive.csproj", "{65B9DAF7-F7AC-4648-9C12-D28827129452}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SendToAXviaSB", "SendToAXviaSB\SendToAXviaSB.csproj", "{BA1C78C8-07DE-436A-A805-0B9B45C0AB40}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -39,6 +41,10 @@ Global
 		{65B9DAF7-F7AC-4648-9C12-D28827129452}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{65B9DAF7-F7AC-4648-9C12-D28827129452}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{65B9DAF7-F7AC-4648-9C12-D28827129452}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BA1C78C8-07DE-436A-A805-0B9B45C0AB40}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BA1C78C8-07DE-436A-A805-0B9B45C0AB40}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BA1C78C8-07DE-436A-A805-0B9B45C0AB40}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BA1C78C8-07DE-436A-A805-0B9B45C0AB40}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
