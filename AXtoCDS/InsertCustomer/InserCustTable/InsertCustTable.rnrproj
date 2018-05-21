@@ -1,0 +1,73 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <Configuration>Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <Model>InsertToCustTable</Model>
+    <DBSyncInBuild>False</DBSyncInBuild>
+    <GenerateFormAdaptors>False</GenerateFormAdaptors>
+    <Company>
+    </Company>
+    <Partition>initial</Partition>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <OutputPath>bin</OutputPath>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <DataEntityExpandParentChildRelations>False</DataEntityExpandParentChildRelations>
+    <DataEntityUseLabelTextAsFieldName>False</DataEntityUseLabelTextAsFieldName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ProjectGuid>{33241916-4ec2-49f7-b9da-580c2aec3a79}</ProjectGuid>
+    <Name>InsertCustTable</Name>
+    <RootNamespace>InserCustTable</RootNamespace>
+    <StartupObject>ReceiveSB</StartupObject>
+    <StartupType>Class</StartupType>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="AxClass\InsertCustTableService">
+      <SubType>Content</SubType>
+      <Name>InsertCustTableService</Name>
+      <Link>InsertCustTableService</Link>
+    </Content>
+    <Content Include="AxClass\MyInfoLogger">
+      <SubType>Content</SubType>
+      <Name>MyInfoLogger</Name>
+      <Link>MyInfoLogger</Link>
+    </Content>
+    <Content Include="AxClass\ReceiveSB">
+      <SubType>Content</SubType>
+      <Name>ReceiveSB</Name>
+      <Link>ReceiveSB</Link>
+    </Content>
+    <Content Include="AxClass\TestInsert">
+      <SubType>Content</SubType>
+      <Name>TestInsert</Name>
+      <Link>TestInsert</Link>
+    </Content>
+    <Content Include="AxServiceGroup\DataAccess">
+      <SubType>Content</SubType>
+      <Name>DataAccess</Name>
+      <Link>DataAccess</Link>
+    </Content>
+    <Content Include="AxService\InsertCustTable">
+      <SubType>Content</SubType>
+      <Name>InsertCustTable</Name>
+      <Link>InsertCustTable</Link>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="MessagingTypeHandler, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <Name>MessagingTypeHandler</Name>
+      <HintPath>C:\Users\Admine324f17786\Documents\Visual Studio 2015\Projects\MessagingTypeHandler\MessagingTypeHandler\bin\Release\MessagingTypeHandler.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.ServiceBus, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+      <Name>Microsoft.ServiceBus</Name>
+      <HintPath>C:\Users\Admine324f17786\Desktop\windowsazure.servicebus.4.1.9\lib\net45\Microsoft.ServiceBus.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.Common.targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Dynamics\AX\Microsoft.Dynamics.Framework.Tools.BuildTasks.targets" />
+</Project>
