@@ -9,7 +9,7 @@ namespace Producer
     internal sealed class EventGenerator
     {
         // i.e. 1 in every 20 transactions is an anomaly
-        private const int AnomalyFactor = 20;
+        private const int AnomalyFactor = 100;
 
         private const int MaxAmount = 1000;
 
@@ -35,6 +35,15 @@ namespace Producer
             "New York",
             "Kahului",
             "Miami",
+        };
+
+        private readonly List<string> emailAddresses = new List<string>
+        {
+            "anomaliedemo1@outlook.com", 
+            "anomaliedemo2@outlook.com", 
+            "anomaliedemo3@outlook.com", 
+            "anomaliedemo4@outlook.com", 
+            "anomaliedemo5@outlook.com", 
         };
 
         public IEnumerable<Transaction> GenerateEvents(int count)
@@ -70,6 +79,7 @@ namespace Producer
             var index = random.Next(0, maxIndex);
             var cc = knownCreditCards[index];
             var location = knownLocations[index];
+            var email = emailAddresses[index];
 
             bool isAnomaly = (random.Next(0, AnomalyFactor) % AnomalyFactor) == 0;
 
@@ -83,6 +93,7 @@ namespace Producer
                     Location = location,
                     CreditCardId = cc,
                     Timestamp = timestamp,
+                    Email = email
                 },
                 Type = TransactionType.Regular,
             };
@@ -113,6 +124,7 @@ namespace Producer
                         Location = newLocation,
                         CreditCardId = cc,
                         Timestamp = timestamp + TimeSpan.FromSeconds(2), // suspect transaction time range is close to a regular transaction
+                        Email = email
                     },
                     Type = TransactionType.Suspect,
                 };
