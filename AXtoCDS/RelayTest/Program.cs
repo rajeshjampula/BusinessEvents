@@ -1,18 +1,18 @@
 ﻿namespace RelayTest
 {
     using System;
-    using System.IO;
-    using System.Threading;
+    using System.IO;    
     using System.Net;
     using System.Threading.Tasks;
     using Microsoft.Azure.Relay;
+    using System.Linq;
 
     public class Program
     {
-        private const string RelayNamespace = "{RelayNamespace}.servicebus.windows.net";
-        private const string ConnectionName = "{HybridConnectionName}";
-        private const string KeyName = "{SASKeyName}";
-        private const string Key = "{SASKey}";
+        private const string RelayNamespace = "d365prototp.servicebus.windows.net";
+        private const string ConnectionName = "getegdata";
+        private const string KeyName = "RootManageSharedAccessKey";
+        private const string Key = "FSFffEq38RWrqMp3S2cb0UemjFJ6nNeNw1u5yu3CP5c=";
 
         public static void Main(string[] args)
         {
@@ -35,12 +35,13 @@
                 // Do something with context.Request.Url, HttpMethod, Headers, InputStream...
                 context.Response.StatusCode = HttpStatusCode.OK;
                 context.Response.StatusDescription = "OK";
-                using (var sw = new StreamWriter(context.Response.OutputStream))
+                /*using (var sw = new StreamWriter(context.Response.OutputStream))
                 {
                     sw.WriteLine("hello!");
-                }
+                }*/
 
                 // The context MUST be closed here
+                TraceRequest(context.Request);
                 context.Response.Close();
             };
 
@@ -55,6 +56,18 @@
 
             // Close the listener after you exit the processing loop.
             await listener.CloseAsync();
+        }
+
+        static void TraceRequest(RelayedHttpListenerRequest request)
+        {
+            Console.WriteLine();
+            Console.WriteLine();
+
+            Console.WriteLine($"{DateTime.UtcNow}: Received events for eghcintegrationtopic");
+
+            Console.WriteLine($"{request.HttpMethod} {request.Url}");
+            request.Headers.AllKeys.ToList().ForEach((k) => Console.WriteLine($"{k}: {request.Headers[k]}"));
+            Console.WriteLine(new StreamReader(request.InputStream).ReadToEnd());
         }
     }
 }
