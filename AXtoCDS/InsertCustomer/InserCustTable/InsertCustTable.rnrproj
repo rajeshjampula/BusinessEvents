@@ -23,7 +23,7 @@
     <ProjectGuid>{33241916-4ec2-49f7-b9da-580c2aec3a79}</ProjectGuid>
     <Name>InsertCustTable</Name>
     <RootNamespace>InserCustTable</RootNamespace>
-    <StartupObject>ReceiveSB</StartupObject>
+    <StartupObject>SendEventsToGrid</StartupObject>
     <StartupType>Class</StartupType>
   </PropertyGroup>
   <ItemGroup>
@@ -42,6 +42,11 @@
       <Name>ReceiveSB</Name>
       <Link>ReceiveSB</Link>
     </Content>
+    <Content Include="AxClass\SendEventsToGrid">
+      <SubType>Content</SubType>
+      <Name>SendEventsToGrid</Name>
+      <Link>SendEventsToGrid</Link>
+    </Content>
     <Content Include="AxClass\TestInsert">
       <SubType>Content</SubType>
       <Name>TestInsert</Name>
@@ -59,6 +64,10 @@
     </Content>
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="LoadGridLibrary, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
+      <Name>LoadGridLibrary</Name>
+      <HintPath>K:\AosService\WebRoot\bin\LoadGridLibrary.dll</HintPath>
+    </Reference>
     <Reference Include="MessagingTypeHandler, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null">
       <Name>MessagingTypeHandler</Name>
       <HintPath>C:\Users\Admine324f17786\Documents\Visual Studio 2015\Projects\MessagingTypeHandler\MessagingTypeHandler\bin\Release\MessagingTypeHandler.dll</HintPath>

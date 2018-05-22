@@ -1,12 +1,14 @@
 ﻿using System;
-using Newtonsoft.Json;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
 using Microsoft.Azure.EventGrid;
 using Microsoft.Azure.EventGrid.Models;
-using System.Threading.Tasks;
-using System.Collections.Generic;
 using System.Diagnostics;
+using Newtonsoft.Json;
 
-namespace EventGridTestApp
+namespace LoadGridLibrary
 {
     class myRecord
     {
@@ -16,25 +18,20 @@ namespace EventGridTestApp
         public string theCompany { get; set; }
     }
 
-    class Program
+    public class GridLoader
     {
-        static void Main(string[] args)
-        {
-            MainAsync().GetAwaiter().GetResult();
-        }
-
-        static async Task MainAsync()
-        {
+        public static int SubmitEventsToGrid(int howMany)
+        {            
             var credentials = new TopicCredentials("ZjvlWXjewB4UAu+BikWkV7cw/TJYirWn0SH+mW6UOis=");
 
             var client = new EventGridClient(credentials);
 
-            var events = new List<EventGridEvent>();            
+            var events = new List<EventGridEvent>();
 
             Stopwatch st = new Stopwatch();
             st.Start();
             //Prepare data
-            for (int i = 1; i <= 1000; i++)
+            for (int i = 1; i <= howMany; i++)
             {
                 string theSubject = "";
                 string theGuid = "";
@@ -84,13 +81,12 @@ namespace EventGridTestApp
             // Format and display the TimeSpan value.
             string elapsedTime = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
                 ts.Hours, ts.Minutes, ts.Seconds,
-                ts.Milliseconds / 10);
-            Console.WriteLine("Prepare List elapsed time: " + elapsedTime);
+                ts.Milliseconds / 10);            
 
             Stopwatch st2 = new Stopwatch();
             st2.Start();
             // Send
-            await client.PublishEventsWithHttpMessagesAsync("anothertopic.westus2-1.eventgrid.azure.net", events);
+            client.PublishEventsWithHttpMessagesAsync("anothertopic.westus2-1.eventgrid.azure.net", events);
 
             st2.Stop();
             TimeSpan ts2 = st2.Elapsed;
@@ -99,9 +95,8 @@ namespace EventGridTestApp
             string elapsedTime2 = String.Format("{0:00}:{1:00}:{2:00}.{3:00}",
                 ts2.Hours, ts2.Minutes, ts2.Seconds,
                 ts2.Milliseconds / 10);
-            Console.WriteLine("Sending List elapsed time: " + elapsedTime2);
-            Console.WriteLine("Press any key to exit.");
-            Console.ReadLine();
+
+            return howMany;
         }
     }
 }
