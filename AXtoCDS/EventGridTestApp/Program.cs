@@ -34,7 +34,7 @@ namespace EventGridTestApp
             Stopwatch st = new Stopwatch();
             st.Start();
             //Prepare data
-            for (int i = 1; i <= 1000; i++)
+            for (int i = 1; i <= 10; i++)
             {
                 string theSubject = "";
                 string theGuid = "";
