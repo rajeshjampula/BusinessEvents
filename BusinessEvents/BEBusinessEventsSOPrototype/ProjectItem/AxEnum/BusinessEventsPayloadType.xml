@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEnum xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsPayloadType</Name>
+	<EnumValues>
+		<AxEnumValue>
+			<Name>JSON</Name>
+		</AxEnumValue>
+		<AxEnumValue>
+			<Name>XML</Name>
+			<Value>1</Value>
+		</AxEnumValue>
+	</EnumValues>
+</AxEnum>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxEdt xmlns:i="http://www.w3.org/2001/XMLSchema-instance" xmlns=""
+	i:type="AxEdtString">
+	<Name>EndpointIdentifier</Name>
+	<Extends>String30</Extends>
+	<ReferenceTable>AzureMessagingConfig</ReferenceTable>
+	<ArrayElements />
+	<Relations />
+	<TableReferences>
+		<AxEdtTableReference>
+			<RelatedField>EndpointIdentifier</RelatedField>
+			<Table>AzureMessagingConfig</Table>
+		</AxEdtTableReference>
+	</TableReferences>
+</AxEdt>

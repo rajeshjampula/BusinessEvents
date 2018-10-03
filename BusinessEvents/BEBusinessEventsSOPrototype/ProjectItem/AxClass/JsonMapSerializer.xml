@@ -1,0 +1,172 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>JsonMapSerializer</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Newtonsoft.Json.Linq;
+using MetaModel=Microsoft.Dynamics.AX.Metadata.MetaModel;
+class JsonMapSerializer extends JsonSerializer
+{
+    // Deserializers will know how to deserialize a particular version. When
+    // information is added to the serialized format, the version number
+    // should be increased.
+    private const int version = 1;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>SerializeField</Name>
+				<Source><![CDATA[
+    protected JObject SerializeField(Common _table, MetaModel.AxMapBaseField _field)
+    {
+        JObject jsonField = new JObject();
+        str fieldName = _field.Name;
+        var fieldId = fieldName2Id(_table.TableId, fieldName);
+           
+        jsonField.set_Item('Name', fieldName);
+        jsonField.set_Item('Id', fieldId);
+
+        anytype fieldValue = _table.(fieldId);
+
+        if (_field is MetaModel.AxMapFieldContainer)
+        {
+            container v = fieldValue;
+            jsonField.set_Item('Type', 'container');
+            jsonField.set_Item('Value', this.containerToJson(v));
+        }
+        else if (_field is MetaModel.AxMapFieldEnum)
+        {
+            var enum = (_field as MetaModel.AxMapFieldEnum).EnumType;
+            if (enum == 'boolean')
+            {
+                jsonField.set_Item('Type', 'boolean');
+                System.Boolean b = fieldValue != 0;
+                jsonField.set_Item('Value', new JValue(b));
+            }
+            else
+            {
+                jsonField.set_Item('Type', 'enum');
+
+                jsonField.set_Item('Enum', enum);
+                jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(fieldValue, Types::Enum)));
+            }
+        }
+        else if (_field is MetaModel.AxMapFieldGuid)
+        {
+            guid v = any2Guid(fieldValue);
+            jsonField.set_Item('Type', 'guid');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Guid)));
+        }
+        else if (_field is MetaModel.AxMapFieldInt)
+        {
+            int v = any2Int(fieldValue);
+            jsonField.set_Item('Type', 'int');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Integer)));
+        }
+        else if (_field is MetaModel.AxMapFieldInt64)
+        {
+            int64 v = any2Int64(fieldValue);
+            jsonField.set_Item('Type', 'int64');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Int64)));
+        }
+        else if (_field is MetaModel.AxMapFieldReal)
+        {
+            real v = any2Real(fieldValue);
+            jsonField.set_Item('Type', 'decimal');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Real)));
+        }
+        else if (_field is MetaModel.AxMapFieldString)
+        {
+            str v = any2Str(fieldValue);
+            jsonField.set_Item('Type', 'string');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::String)));
+        }
+        else if (_field is MetaModel.AxMapFieldTime)
+        {
+            // There is no kernel function to produce a value of type Time.
+            TimeOfDay v = fieldValue;
+            jsonField.set_Item('Type', 'time');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Time)));
+        }
+        else if (_field is MetaModel.AxMapFieldUtcDateTime)
+        {
+            utcdatetime v = FieldValue;
+            jsonField.set_Item('Type', 'utcdatetime');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::UtcDateTime)));
+        }
+        else if (_field is MetaModel.AxMapFieldDate)
+        {
+            jsonField.set_Item('Type', 'date');
+            jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(fieldValue, Types::Date)));
+        }
+
+        return jsonField;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>SerializeMapFields</Name>
+				<Source><![CDATA[
+    protected JArray SerializeMapFields(Common _map, MetaModel.AxMap _metadata, JArray _jsonFields)
+    {
+        var fieldsMetadata = _metadata.Fields;
+        int fieldCount = fieldsMetadata.Count;
+
+        for (int f = 0; f < fieldCount; f++)
+        {
+            MetaModel.AxMapBaseField field = fieldsMetadata.get_Item(f);
+
+            JObject jsonField = this.serializeField(_map, field);
+            _jsonFields.Add(jsonField);
+        }
+        return _jsonFields;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>jsonSerializeMap</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the given map.
+    /// </summary>
+    /// <param name="_view">The view to serialize</param>
+    /// <returns>The json document for the designated map.</returns>
+    private JObject jsonSerializeMap(Common _map)
+    {
+        JObject jsonRoot = new JObject();
+        JObject jsonTable = new JObject();
+
+        TableName name = tableId2Name(_map.TableId);
+        MetaModel.AxMap metadata = Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetMap(name);
+
+        jsonTable.set_Item('Version', JsonMapSerializer::version);
+        jsonTable.set_Item('Name', name);
+        jsonTable.set_Item('Id', _map.TableID);
+
+        JArray jsonFields = new JArray();
+        JArray fields = this.SerializeMapFields(_map, metadata, jsonFields);
+        jsonTable.Add('Fields', fields);
+
+        jsonRoot.set_Item('Map', jsonTable);
+        return jsonRoot;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>Serialize</Name>
+				<Source><![CDATA[
+    str Serialize(Common _map)
+    {
+        JObject document = this.jsonSerializeMap(_map);
+        return document.ToString();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

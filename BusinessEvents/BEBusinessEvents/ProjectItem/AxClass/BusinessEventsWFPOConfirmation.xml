@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsWFPOConfirmation</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+class BusinessEventsWFPOConfirmation extends BusinessEventsBase
+{
+    WorkflowEventArgs  workflowEventArgs;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+    public static BusinessEventsWFPOConfirmation construct(WorkflowEventArgs  _workflowEventArgs)
+    {
+        BusinessEventsWFPOConfirmation beWFPOConf = new BusinessEventsWFPOConfirmation();
+        beWFPOConf.workflowEventArgs = _workflowEventArgs;
+        return beWFPOConf;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run()
+    {
+        this.GetBusinessEventConfig(classStr(BusinessEventsWFPOConfirmation));
+
+        // Only run if in the specified company and business events are enabled or if Business Events are enabled but not company specific.
+        // Ensure that we don't have BODMAS issue here. Conditions may need to be turned around.
+        // ToDo: Remove company specific column, make company part of PK and adjust filter
+        if((BEConfiguration && BEConfiguration.Enabled && BEConfiguration.CompanySpecific && BEConfiguration.company == curExt()) ||
+          (BEConfiguration && BEConfiguration.Enabled && !BEConfiguration.CompanySpecific))
+        {
+            this.FetchPayload();
+            this.SendEvent(this.SerializePayload());
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>FetchPayload</Name>
+				<Source><![CDATA[
+    protected void FetchPayload()
+    {
+        super();
+
+        changecompany(WorkflowEventArgs.parmWorkflowContext().parmCompanyId())
+        {
+            Common c = new DictTable(WorkflowEventArgs.parmWorkflowContext().parmTableId()).makeRecord();
+            select firstonly c where c.RecId == WorkflowEventArgs.parmWorkflowContext().parmRecId();
+            Payload.addStart(c);
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

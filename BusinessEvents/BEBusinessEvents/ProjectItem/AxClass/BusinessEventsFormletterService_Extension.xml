@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsFormletterService_Extension</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+[ExtensionOf(ClassStr(FormletterService))]
+final class BusinessEventsFormletterService_Extension
+{   
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>postPurchaseOrderConfirmation</Name>
+				<Source><![CDATA[
+    public FormletterOutputContract postPurchaseOrderConfirmation(PurchFormLetterPurchOrderContract _contract)
+    {                    
+        //return next postPurchaseOrderConfirmation(_contract);        
+        var purchaseOrderConfirmResult = next postPurchaseOrderConfirmation(_contract);
+        // after return        
+        BusinessEventsPOConfirmation::construct(_contract).run();
+
+        return purchaseOrderConfirmResult;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderPackingSlip</Name>
+				<Source><![CDATA[
+    // ToDo: Need way of not sending if tts aborted or send notification on ttsabort.
+    public FormletterOutputContract postPurchaseOrderPackingSlip(PurchFormLetterPackingSlipContract _contract)
+    {
+        var packingSlipResult = next postPurchaseOrderPackingSlip(_contract);
+
+        BusinessEventsPOReceipt::construct(_contract).run();
+
+        return packingSlipResult;
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

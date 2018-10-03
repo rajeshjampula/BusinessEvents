@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxLabelFile xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>AzureMessagingConfig_en-US</Name>
+	<LabelContentFileName>AzureMessagingConfig.en-US.label.txt</LabelContentFileName>
+	<LabelFileId>AzureMessagingConfig</LabelFileId>
+	<RelativeUriInModelStore>ApplicationSuiteExtension\ApplicationSuiteExtension\AxLabelFile\LabelResources\en-US\AzureMessagingConfig.en-US.label.txt</RelativeUriInModelStore>
+</AxLabelFile>

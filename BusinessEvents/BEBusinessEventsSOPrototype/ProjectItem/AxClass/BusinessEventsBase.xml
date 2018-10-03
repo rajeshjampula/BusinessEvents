@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsBase</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+// ToDo: EValuate to transfer via contracts and not complex set of parameters where applicable.
+abstract class BusinessEventsBase
+{            
+    // These are business events triggered by code. We will have field level change events and data events later on.
+    BusinessCodeEventsDefinition BEConfiguration;
+    List Payload;
+    Common header;
+    List Lines;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>GetBusinessEventConfig</Name>
+				<Source><![CDATA[
+    /* Sample run method
+    public void run()
+    {
+        this.GetBusinessEventConfig(classStr(BusinessEventsPOConfirmation));
+
+        // Only run if in the specified company and business events are enabled or if Business Events are enabled but not company specific
+        if(BEConfiguration && ((BEConfiguration.Enabled && BEConfiguration.CompanySpecific && BEConfiguration.company == curExt()) ||
+          (BEConfiguration.Enabled && !BEConfiguration.CompanySpecific)))
+        {
+            this.FetchPayload();
+            this.SerializePayload();
+        }
+    }
+    */
+
+    // The configuration data of the actual business event. This will also contain the Azure endpoint.
+    protected void GetBusinessEventConfig(str _BEClassName)
+    {
+        select firstonly BEConfiguration where BEConfiguration.BusinessEventClassName == _BEClassName;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>FetchPayload</Name>
+				<Source><![CDATA[
+    // Send header and lines together 
+    protected void FetchPayload()
+    {
+        Payload = new List(Types::Record);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>FetchPayloadHeaderLines</Name>
+				<Source><![CDATA[
+    // ToDo: - Separate header and lines - Common header goes here.
+    protected void FetchPayloadHeaderLines()
+    {
+        Lines = new List(Types::Record);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>SerializePayload</Name>
+				<Source><![CDATA[
+    // Needs to return a List containing JSON or XML, use this if you send header and lines together
+    // ToDo: Add XML Serializer
+    // ToDo: Don't serialize if nothing to serialize
+    protected List SerializePayload(NoYes separateHeaderAndLines=NoYes::No, BusinessEventsPayloadType _BEPayloadType = BusinessEventsPayloadType::JSON)
+    {
+        List serializedPayload = new List(Types::String);
+        Enumerator enum = Payload.getEnumerator();
+
+        while(enum.moveNext())
+        {
+            Common c = enum.current();
+
+            //serializedPayload.addEnd(c.xml()); // This is somewhat buggy...
+            serializedPayload.addEnd(JSONSerializer::jsonSerialize(c));
+        }
+
+        return serializedPayload;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>SerializePayloadHeaderLines</Name>
+				<Source><![CDATA[
+    // ToDo: Needs Create a map marking header and lines uniquely and returning the payload
+    // ToDo: Remove Separate Header Lines concept as conversation should be enough.
+    // ToDo: Transfer parameters as object
+    protected Map SerializePayloadHeaderLines(List _serializedPayload,NoYes _separateHeaderAndLines=NoYes::No, BusinessEventsPayloadType _BEPayloadType = BusinessEventsPayloadType::XML)
+    {
+        Map serializedPayload = new Map(Types::String,Types::String);
+
+        return serializedPayload;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>SendEvent</Name>
+				<Source><![CDATA[
+    // Send everything in one message or if bigger documents send conversation with end of document marker   
+    // ToDo: Conversation feature (This feature sends one message per line in a conversation)
+    // ToDo: Transfer parameters as object
+    // ToDo: Don't send if nothing to send
+    protected void SendEvent(List _serializedPayload, NoYes _sendConversation=NoYes::No, AmcService _AzureMessagingService=AmcService::ServiceBusQueue)
+    {
+        switch (_AzureMessagingService)
+        {
+            case AmcService::ServiceBusQueue :
+                ServiceBusQueueClient sbqc = ServiceBusQueueClient::construct(BEConfiguration,NoYes::No,NoYes::No, _serializedPayload, New Map(Types::String,Types::String));
+                sbqc.run();
+                break;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>SendEventHeaderLines</Name>
+				<Source><![CDATA[
+    // Send everything in one message or if bigger documents send conversation with end of document marker
+    // This is for sending header and lines seperate
+    // ToDo: Conversation feature (This feature sends one message per line in a conversation)
+    protected void SendEventHeaderLines(List _serializedPayload, NoYes _sendConversation=NoYes::No, AmcService _AzureMessagingService=AmcService::ServiceBusQueue)
+    {
+
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

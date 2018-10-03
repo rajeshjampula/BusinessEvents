@@ -1,0 +1,15 @@
+AmcHeadling=Add Azure Messaging Endpoint Configuration
+AmcWCFRelay=Azure WCF Relay
+AmcServiceBusNS=Service Bus Namespace
+AmcServiceBusQueue=Service Bus Queue
+AmcServiceBusTopic=Service Bus Topic
+AmcServiceBusSubscription=Service Bus Topic Subscription
+AmcEventHubs=Event Hubs Namespace
+AmcEventHub=Event Hub
+AmcEventGridTopic=Event Grid Topic
+AmcEntityName=Eventing or Messaging entity Name
+AmcDescription=Description
+AmcEndpointId=Endpoint ID
+AmcAzureProduct=Azure Messaging or Eventing Product
+AmcLegalEntity=LE specific endpoints
+AmcAccessKey=SAS key or token or Connection string

@@ -1,0 +1,293 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>JsonTableSerializer</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Newtonsoft.Json.Linq;
+using MetaModel=Microsoft.Dynamics.AX.Metadata.MetaModel;
+class JsonTableSerializer extends JsonSerializer
+{
+    // Deserializers will know how to deserialize a particular version. When
+    // information is added to the serialized format, the version number
+    // should be increased.
+    private const int version = 1;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>SerializeField</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Generate a JObject that represents a field defined by its dictField.
+    /// </summary>
+    /// <param name="_table">
+    /// The table instance containing the field value.
+    /// </param>
+    /// <param name="_field">The metadata describing the field.</param>
+    /// <returns>The JObject containing pertinent field information.</returns>
+    private JObject SerializeField(Common _table, MetaModel.AxTableField _field)
+    {
+        JObject jsonField = new JObject();
+        str fieldName = _field.Name;
+        var fieldId = fieldName2Id(_table.TableId, fieldName);
+           
+        jsonField.set_Item("Name", fieldName);
+        jsonField.set_Item("Id", fieldId);
+        jsonField.set_Item("Mandatory", _field.Mandatory != 0);
+
+        anytype fieldValue = _table.(fieldId);
+
+        if (_field is MetaModel.AxTableFieldContainer)
+        {
+            container v = fieldValue;
+            jsonField.set_Item("Type", "container");
+            jsonField.set_Item("Value", this.containerToJson(v));
+        }
+        else if (_field is MetaModel.AxTableFieldEnum)
+        {
+            var enum = (_field as MetaModel.AxTableFieldEnum).EnumType;
+            if (enum == "boolean")
+            {
+                jsonField.set_Item("Type", "boolean");
+                System.Boolean b = fieldValue != 0;
+                jsonField.set_Item("Value", new JValue(b));
+            }
+            else
+            {
+                jsonField.set_Item("Type", "enum");
+
+                jsonField.set_Item("Enum", enum);
+                jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(fieldValue, Types::Enum)));
+            }
+        }
+        else if (_field is MetaModel.AxTableFieldGuid)
+        {
+            guid v = any2Guid(fieldValue);
+            jsonField.set_Item("Type", "guid");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::Guid)));
+        }
+        else if (_field is MetaModel.AxTableFieldInt)
+        {
+            int v = any2Int(fieldValue);
+            jsonField.set_Item("Type", "int");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::Integer)));
+        }
+        else if (_field is MetaModel.AxTableFieldInt64)
+        {
+            int64 v = any2Int64(fieldValue);
+            jsonField.set_Item("Type", "int64");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::Int64)));
+        }
+        else if (_field is MetaModel.AxTableFieldReal)
+        {
+            real v = any2Real(fieldValue);
+            jsonField.set_Item("Type", "decimal");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::Real)));
+        }
+        else if (_field is MetaModel.AxTableFieldString)
+        {
+            str v = any2Str(fieldValue);
+            jsonField.set_Item("Type", "string");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::String)));
+        }
+        else if (_field is MetaModel.AxTableFieldTime)
+        {
+            // There is no kernel function to produce a value of type Time.
+            TimeOfDay v = fieldValue;
+            jsonField.set_Item("Type", "time");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::Time)));
+        }
+        else if (_field is MetaModel.AxTableFieldUtcDateTime)
+        {
+            utcdatetime v = FieldValue;
+            jsonField.set_Item("Type", "utcdatetime");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(v, Types::UtcDateTime)));
+        }
+        else if (_field is MetaModel.AxTableFieldDate)
+        {
+            jsonField.set_Item("Type", "date");
+            jsonField.set_Item("Value", new JValue(this.atomicValueToNetObject(fieldValue, Types::Date)));
+        }
+
+        return jsonField;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>serializePredefinedFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the predefined fields (like RecId, DataAreaId etc). The availability of each
+    /// of the predefined fields is provided in the metadata.
+    /// </summary>
+    /// <param name = "_table">The table instance containing the fields to serialize.</param>
+    /// <param name = "_tableMetadata">The metadata describing the table.</param>
+    /// <param name = "_jsonFields">The array to which the serialized fields are added.</param>
+    /// <returns>The method returns the jsonFields parameter to support fluent APIs.</returns>
+    private JArray serializePredefinedFields(Common _table, MetaModel.AxTable _tableMetadata, JArray _jsonFields)
+    {
+        MetaModel.AxTable commonMetadata = Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetTable("Common");
+        var commonFields = commonMetadata.get_Fields();
+
+        // These fields are present on all tables and maps
+        _jsonFields.Add(this.serializeField(_table, commonFields.get_Item("RecId")));
+        _jsonFields.Add(this.serializeField(_table, commonFields.get_Item("RecVersion")));
+
+        // The following fields may or may not be included in the table,
+        // depending on the metadata settings.
+        if (_tableMetadata.get_CreatedBy())
+        {
+            var f = commonFields.get_Item("CreatedBy");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_CreatedDateTime())
+        {
+            var f = commonFields.get_Item("CreatedDateTime");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_CreatedTransactionId())
+        {
+            var f = commonFields.get_Item("CreatedTransactionId");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_ModifiedBy())
+        {
+            var f = commonFields.get_Item("ModifiedBy");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_ModifiedDateTime())
+        {
+            var f = commonFields.get_Item("ModifiedDateTime");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_ModifiedTransactionId())
+        {
+            var f = commonFields.get_Item("ModifiedTransactionId");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_SaveDataPerCompany())
+        {
+            var f = commonFields.get_Item("DataAreaId");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        if (_tableMetadata.get_SaveDataPerPartition())
+        {
+            var f = commonFields.get_Item("Partition");
+            _jsonFields.Add(this.serializeField(_table, f));
+        }
+
+        return _jsonFields;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>serializeUserFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the user defined fields (i.e. the fields that are not
+    /// predefined).
+    /// </summary>
+    /// <param name = "_table">The table containing the fields.</param>
+    /// <param name = "_tableMetadata">The metadata describing the table.</param>
+    /// <param name = "_jsonFields">The array to which the serialized fields are added.</param>
+    /// <returns>The method returns the jsonFields parameter to support fluent APIs.</returns>
+    /// <returns>The JSON array containing the user fields.</returns>
+    private JArray serializeUserFields(Common _table, MetaModel.AxTable _tableMetadata, JArray _jsonFields)
+    {
+        if (_tableMetadata.get_SupportInheritance() && _tableMetadata.get_Extends())
+        {
+            TableName extendsTable = _tableMetadata.get_Extends();
+            MetaModel.AxTable extendsMetadata = Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetTable(extendsTable);
+            this.SerializeUserFields(_table, extendsMetadata, _jsonFields);
+        }
+
+        var fieldsMetadata = _tableMetadata.get_Fields();
+        int fieldCount = fieldsMetadata.get_Count();
+
+        for (int f = 0; f < fieldCount; f++)
+        {
+            MetaModel.AxTableField field = fieldsMetadata.get_Item(f);
+
+            JObject jsonField = this.serializeField(_table, field);
+            _jsonFields.Add(jsonField);
+        }
+
+        return _jsonFields;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>serializeFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the fields on the given table, taking into account table inheritance.
+    /// </summary>
+    /// <param name = "_table">The table instance that contains the fields to serialize.</param>
+    /// <param name = "_tableMetadata">The metadata describing the table containing the fields.</param>
+    /// <param name = "_jsonFields">The array to which the fields are added</param>
+    /// <returns>This method returns the jsonFields parameter. to support fluent APIs.</returns>
+    private JArray serializeFields(Common _table, MetaModel.AxTable _tableMetadata, JArray _jsonFields)
+    {
+        this.SerializePredefinedFields(_table, _tableMetadata, _jsonFields);
+        this.SerializeUserFields(_table, _tableMetadata, _jsonFields);
+        return _jsonFields;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>jsonSerializeTable</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the given table.
+    /// </summary>
+    /// <param name = "_table">The table to serialize</param>
+    /// <returns>The json document for the designated table.</returns>
+    private JObject jsonSerializeTable(Common _table)
+    {
+        JObject jsonRoot = new JObject();
+        JObject jsonTable = new JObject();
+
+        TableName tableName = tableId2Name(_table.TableId);
+        MetaModel.AxTable tableMetadata = Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetTable(tableName);
+
+        jsonTable.set_Item("Version", JsonTableSerializer::version);
+        jsonTable.set_Item("Name", tableName);
+        jsonTable.set_Item("Id", _table.TableID);
+
+        JArray jsonFields = new JArray();
+        JArray fields = this.SerializeFields(_table, tableMetadata, jsonFields);
+        jsonTable.Add("Fields", fields);
+
+        jsonRoot.set_Item("Table", jsonTable);
+
+        return jsonRoot;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>Serialize</Name>
+				<Source><![CDATA[
+    public str Serialize(Common _table)
+    {
+        JObject doc = this.jsonSerializeTable(_table);
+        return doc.ToString();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

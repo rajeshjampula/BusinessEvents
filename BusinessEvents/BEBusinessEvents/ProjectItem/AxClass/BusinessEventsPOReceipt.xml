@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsPOReceipt</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+// ToDo: Evaluate if it makes sense to unify one process into one class and have just multiple payloads
+class BusinessEventsPOReceipt extends BusinessEventsBase
+{
+    PurchFormLetterPackingSlipContract POReceiptContract;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+    public static BusinessEventsPOReceipt construct(PurchFormLetterPackingSlipContract _contract)
+    {
+        BusinessEventsPOReceipt bePOReceipt = new BusinessEventsPOReceipt();
+        bePOReceipt.POReceiptContract = _contract;
+        return bePOReceipt;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run()
+    {
+        this.GetBusinessEventConfig(classStr(BusinessEventsPOReceipt));
+
+        // Only run if in the specified company and business events are enabled or if Business Events are enabled but not company specific.
+        // Ensure that we don't have BODMAS issue here. Conditions may need to be turned around.
+        // ToDo: Remove company specific column, make company part of PK and adjust filter
+        if((BEConfiguration && BEConfiguration.Enabled && BEConfiguration.CompanySpecific && BEConfiguration.company == curExt()) ||
+          (BEConfiguration && BEConfiguration.Enabled && !BEConfiguration.CompanySpecific))
+        {
+            this.FetchPayload();
+            this.SendEvent(this.SerializePayload());
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>FetchPayload</Name>
+				<Source><![CDATA[
+    protected void FetchPayload()
+    {
+        super();
+        VendPackingSlipJour vendPackingSlipJour;
+        VendPackingSlipTrans vendPackingSlipTrans;
+        PurchTable purchTable;
+
+        purchTable = POReceiptContract.parmCallerTable();
+        select vendPackingSlipJour where vendPackingSlipJour.PurchId == PurchTable.PurchId;
+
+        // Header at the start of the list
+        Payload.addStart(vendPackingSlipJour);
+
+        while select vendPackingSlipTrans where vendPackingSlipTrans.PackingSlipId == vendPackingSlipJour.PackingSlipId
+        {
+            // Add all other records at the end.
+            Payload.addEnd(vendPackingSlipTrans);
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

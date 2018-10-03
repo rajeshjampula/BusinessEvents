@@ -1,0 +1,4 @@
+DirectionInbound=Inbound
+ ;Inbound
+DirectionOutbound=Outbound
+ ;Outbound

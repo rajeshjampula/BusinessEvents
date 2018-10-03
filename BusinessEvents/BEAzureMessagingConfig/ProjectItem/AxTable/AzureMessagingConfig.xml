@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxTable xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>AzureMessagingConfig</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+public class AzureMessagingConfig extends common
+{
+}
+
+]]></Declaration>
+		<Methods />
+	</SourceCode>
+	<SubscriberAccessLevel>
+		<Read>Allow</Read>
+	</SubscriberAccessLevel>
+	<TableGroup>Framework</TableGroup>
+	<CacheLookup>Found</CacheLookup>
+	<ClusteredIndex>EndpointIdentifier</ClusteredIndex>
+	<PrimaryIndex>EndpointIdentifier</PrimaryIndex>
+	<SaveDataPerCompany>No</SaveDataPerCompany>
+	<DeleteActions />
+	<FieldGroups>
+		<AxTableFieldGroup>
+			<Name>AutoReport</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoLookup</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoIdentification</Name>
+			<AutoPopulate>Yes</AutoPopulate>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoSummary</Name>
+			<Fields />
+		</AxTableFieldGroup>
+		<AxTableFieldGroup>
+			<Name>AutoBrowse</Name>
+			<Fields />
+		</AxTableFieldGroup>
+	</FieldGroups>
+	<Fields>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>AzureProduct</Name>
+			<Label>@AzureMessagingConfig:AmcAzureProduct</Label>
+			<Mandatory>Yes</Mandatory>
+			<EnumType>AmcService</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EndpointIdentifier</Name>
+			<ExtendedDataType>EndpointIdentifier</ExtendedDataType>
+			<Label>@AzureMessagingConfig:AmcEndpointId</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>AccessKey</Name>
+			<ExtendedDataType>String255</ExtendedDataType>
+			<Label>@AzureMessagingConfig:AmcAccessKey</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>EntityName</Name>
+			<ExtendedDataType>String50</ExtendedDataType>
+			<Label>@AzureMessagingConfig:AmcEntityName</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>Description</Name>
+			<ExtendedDataType>String255</ExtendedDataType>
+			<Label>@AzureMessagingConfig:AmcDescription</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldString">
+			<Name>LegalEntity</Name>
+			<ExtendedDataType>DataAreaId</ExtendedDataType>
+			<Label>@AzureMessagingConfig:AmcLegalEntity</Label>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>BatchSend</Name>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldEnum">
+			<Name>BatchReceive</Name>
+			<EnumType>NoYes</EnumType>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt">
+			<Name>BatchSize</Name>
+		</AxTableField>
+		<AxTableField xmlns=""
+			i:type="AxTableFieldInt">
+			<Name>PrefetchSize</Name>
+		</AxTableField>
+	</Fields>
+	<FullTextIndexes />
+	<Indexes>
+		<AxTableIndex>
+			<Name>Key</Name>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>AzureProduct</DataField>
+				</AxTableIndexField>
+				<AxTableIndexField>
+					<DataField>EndpointIdentifier</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+		<AxTableIndex>
+			<Name>EndpointIdentifier</Name>
+			<Fields>
+				<AxTableIndexField>
+					<DataField>EndpointIdentifier</DataField>
+				</AxTableIndexField>
+			</Fields>
+		</AxTableIndex>
+	</Indexes>
+	<Mappings />
+	<Relations />
+	<StateMachines />
+</AxTable>

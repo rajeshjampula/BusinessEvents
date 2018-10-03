@@ -1,0 +1,116 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="14.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)' == 'Debug|AnyCPU'">
+    <Configuration>Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <Model>BusinessEventPrototype</Model>
+    <DBSyncInBuild>False</DBSyncInBuild>
+    <GenerateFormAdaptors>False</GenerateFormAdaptors>
+    <Company>
+    </Company>
+    <Partition>initial</Partition>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <OutputPath>bin</OutputPath>
+    <TargetFrameworkVersion>v4.6</TargetFrameworkVersion>
+    <DataEntityExpandParentChildRelations>False</DataEntityExpandParentChildRelations>
+    <DataEntityUseLabelTextAsFieldName>False</DataEntityUseLabelTextAsFieldName>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)' == 'Debug' ">
+    <DebugSymbols>true</DebugSymbols>
+    <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
+  </PropertyGroup>
+  <PropertyGroup>
+    <ProjectGuid>{17ec491f-4d65-44b1-a396-b4dcc3c0d7c1}</ProjectGuid>
+    <Name>BusinessEventsSOPrototype</Name>
+    <RootNamespace>BusinessEventsSOPrototype</RootNamespace>
+    <StartupType>
+    </StartupType>
+    <StartupObject>
+    </StartupObject>
+  </PropertyGroup>
+  <ItemGroup>
+    <Content Include="AxClass\BusinessEventsBase">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsBase</Name>
+      <Link>BusinessEventsBase</Link>
+    </Content>
+    <Content Include="AxClass\BusinessEventsContract">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsContract</Name>
+      <Link>BusinessEventsContract</Link>
+    </Content>
+    <Content Include="AxClass\BusinessEventsTestClass">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsTestClass</Name>
+      <Link>BusinessEventsTestClass</Link>
+    </Content>
+    <Content Include="AxClass\JsonMapSerializer">
+      <SubType>Content</SubType>
+      <Name>JsonMapSerializer</Name>
+      <Link>JsonMapSerializer</Link>
+    </Content>
+    <Content Include="AxClass\JSONSerializer">
+      <SubType>Content</SubType>
+      <Name>JSONSerializer</Name>
+      <Link>JSONSerializer</Link>
+    </Content>
+    <Content Include="AxClass\JsonTableSerializer">
+      <SubType>Content</SubType>
+      <Name>JsonTableSerializer</Name>
+      <Link>JsonTableSerializer</Link>
+    </Content>
+    <Content Include="AxClass\JsonViewSerializer">
+      <SubType>Content</SubType>
+      <Name>JsonViewSerializer</Name>
+      <Link>JsonViewSerializer</Link>
+    </Content>
+    <Content Include="AxClass\ServiceBusQueueClient">
+      <SubType>Content</SubType>
+      <Name>ServiceBusQueueClient</Name>
+      <Link>ServiceBusQueueClient</Link>
+    </Content>
+    <Content Include="AxEnum\BusinessEventsDirection">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsDirection</Name>
+      <Link>BusinessEventsDirection</Link>
+    </Content>
+    <Content Include="AxEnum\BusinessEventsPayloadType">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsPayloadType</Name>
+      <Link>BusinessEventsPayloadType</Link>
+    </Content>
+    <Content Include="AxLabelFile\BusinessEventsLabels_en-US">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsLabels_en-US</Name>
+      <Link>BusinessEventsLabels_en-US</Link>
+    </Content>
+    <Content Include="AxTable\BusinessCodeEventsDefinition">
+      <SubType>Content</SubType>
+      <Name>BusinessCodeEventsDefinition</Name>
+      <Link>BusinessCodeEventsDefinition</Link>
+    </Content>
+    <Content Include="AxTable\BusinessEventsExecutionLog">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsExecutionLog</Name>
+      <Link>BusinessEventsExecutionLog</Link>
+    </Content>
+    <Content Include="AxTable\BusinessEventsWFL">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsWFL</Name>
+      <Link>BusinessEventsWFL</Link>
+    </Content>
+    <Content Include="BusinessEventsLabels.en-US.label.txt">
+      <SubType>Content</SubType>
+      <Name>BusinessEventsLabels.en-US.label.txt</Name>
+      <DependentUpon>AxLabelFile\BusinessEventsLabels_en-US</DependentUpon>
+    </Content>
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="Microsoft.ServiceBus, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35">
+      <Name>Microsoft.ServiceBus</Name>
+      <HintPath>K:\AosService\WebRoot\bin\Microsoft.ServiceBus.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.Common.targets" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\Dynamics\AX\Microsoft.Dynamics.Framework.Tools.BuildTasks.targets" />
+</Project>

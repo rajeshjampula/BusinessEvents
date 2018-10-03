@@ -1,0 +1,138 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>ServiceBusQueueClient</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Microsoft.ServiceBus.Messaging;
+using System.Text;
+using System.IO;
+
+// ToDo: Need SB Topic, EH, EG, Cosmos(Table and DocDB), Http, Storage blob connectors
+class ServiceBusQueueClient
+{
+    Common BEConfiguration;
+    List Payload;
+    Map PayloadHeaderLines;
+    NoYes SendConversation;
+    NoYes SendHeaderLines;    
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+    // ToDo: Find better way of nullifying the two payload fields so they don't have to be set.
+    // ToDo: Transfer parameters as object
+    public static ServiceBusQueueClient construct(Common _BEConfiguration, NoYes _SendConversation, NoYes _SendHeaderLines, 
+        List _payload, Map _payloadHeaderLines)
+    {
+        ServiceBusQueueClient sbqc = new ServiceBusQueueClient();
+        sbqc.BEConfiguration = _BEConfiguration;
+        sbqc.Payload = _payload;
+        sbqc.SendConversation = _SendConversation;
+        sbqc.SendHeaderLines = _SendHeaderLines;
+        
+        return sbqc;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    public void run()
+    {
+        this.sendMessage(this.Config(), this.getPayload());
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>Config</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets the current configuration for the logging back plane.
+    /// </summary>
+    /// <returns>Gets the current configuration for the logging back plane.</returns>
+    protected AzureMessagingConfig Config()
+    {
+        AzureMessagingConfig azureMessagingConfig;
+        BusinessCodeEventsDefinition beCodeEventsDefinition = BEConfiguration;
+
+        select azureMessagingConfig where 
+             azureMessagingConfig.EndpointIdentifier == beCodeEventsDefinition.Channel;
+
+        return azureMessagingConfig;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getPayload</Name>
+				<Source><![CDATA[
+    // ToDo: Add convesation payload
+    // ToDo: Add Header Lines seperate payload
+    // ToDo: Need proper way of creating XML here.
+    // ToDo: Add business events description here.
+    // ToDo: Need proper way of getting JSON here and XML / JSON switch
+    // ToDo: Need to actually generate header / line payload based on if flat list or not. Typically we want header line. In some cases flat list. Must be parameterizable outside of BE base class
+    //       If Header line, all lines should be in a separate array for easier processing and looping in external applications.
+    protected str getPayload()
+    {        
+        TextBuffer msgPayload = new TextBuffer();                
+
+        //msgPayload.appendText(@'<Payload>');
+        int counter=1;
+        msgPayload.appendText(@'{ "Record'+int2Str(counter)+'" : ');
+
+        Enumerator enum = Payload.getEnumerator();
+
+        while(enum.moveNext())
+        {
+            msgPayload.appendText(enum.current());
+
+            if(Counter<Payload.elements())
+            {                
+                msgPayload.appendText(@', "Record'+int2Str(counter+1)+'" : ');
+            }
+
+            Counter++;
+        }
+
+        //msgPayload.appendText(@'</Payload>');
+        msgPayload.appendText(@'}');
+
+        return msgPayload.getText();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>sendMessage</Name>
+				<Source><![CDATA[
+    // ToDo: Add retries
+    public void sendMessage(AzureMessagingConfig _amc, str _payload)
+    {
+        str ServiceBusQueueName = _amc.EntityName;
+        str connectionString = _amc.AccessKey;        
+        
+        try
+        {
+            QueueClient sbc = QueueClient::CreateFromConnectionString(connectionString, ServiceBusQueueName);
+            var payloadStream = new MemoryStream(Encoding::UTF8.GetBytes(_payload));
+            BrokeredMessage message = new BrokeredMessage(payloadStream, true);
+            sbc.Send(message);
+        }
+        catch(Exception::CLRError)
+        {
+            System.Exception netexception = CLRInterop::getLastException();
+            ExternalLoggerInfoLogHelper::ExceptionLogger(netexception.ToString());
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>
