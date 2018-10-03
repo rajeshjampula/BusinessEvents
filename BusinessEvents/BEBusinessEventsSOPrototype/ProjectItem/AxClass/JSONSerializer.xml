@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>JSONSerializer</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Newtonsoft.Json.Linq;
+using MetaModel=Microsoft.Dynamics.AX.Metadata.MetaModel;
+
+abstract class JsonSerializer
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>basetype</Name>
+				<Source><![CDATA[
+    protected Types basetype(DictField _field)
+    {
+        int id = _field.typeId();
+        if (id == 0)
+            return _field.type();
+       
+        DictType t = new DictType(id);
+        return t.baseType();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>containerToJson</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Create the JSON array containing the elements in the given X++ container.
+    /// The container will call itself recursively to handle nested containers.
+    /// </summary>
+    /// <param name = "_container">The container to serialize.</param>
+    /// <returns>The array of serialized container values.</returns>
+    protected JArray containerToJson(container _container)
+    {
+        var result = new JArray();
+        if (conLen(_container) == 1 && typeOf(conPeek(_container, 1)) == Types::Blob)
+        {
+            var b = new BinData();
+            b.setData(_container);
+            str content = b.base64Encode();
+            result.Add(new JValue(content));
+        }
+        else
+        {
+            for (int i = 1; i <= conLen(_container); i++)
+            {
+                anytype v = conPeek(_container, i);
+                if (typeOf(v) == Types::Container)
+                {
+                    // Call recursively to deal with containers within the container.
+                    result.Add(this.containerToJson(v));
+                }
+                else
+                {
+                    result.Add(new JValue(this.atomicValueToNetObject(v, typeOf(v))));
+                }
+            }
+        }
+
+        return result;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>atomicValueToNetObject</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets the .NET type corresponding to the given X++ anytype value.
+    /// For instance if the method is passed an anytype value that represents
+    /// an int (i.e. an X++ int), the method will return a System.Int32.
+    /// </summary>
+    /// <param name = "_value">The anytype value for which a System.Object instance is returned.</param>
+    /// <returns>The .NET System.Object value representing the value.</returns>
+    protected System.Object atomicValueToNetObject (anytype _value, Types _type)
+    {
+        switch(_type)
+        {
+            case Types::Date:
+            {
+                Date d = any2Date(_value);
+                System.DateTime v = new System.DateTime(year(d), mthOfYr(d), dayOfMth(d));
+                return v;
+            }
+        case Types::Enum:
+        {
+            int v = _value;
+            return v;
+        }
+    case Types::Guid:
+    {
+        System.Guid v = _value;
+        return v;
+    }
+case Types::Integer:
+{
+    int v = _value;
+    return v;
+}
+case Types::Int64:
+{
+    System.Int64 v = _value;
+    return v;
+}
+case Types::Real:
+{
+    System.Decimal v = any2Real(_value);
+    return v;
+}
+case Types::String:
+{
+    str v = any2Str(_value);
+    return v;
+}
+case Types::Time:
+{
+    // Time is recorded in AX as the number of seconds since midnight.
+    // We choose timespan as the representation of the time of day,
+    // instead of a DateTime instance, that carries around a date
+    // that is not meaningful in this context.
+    System.TimeSpan v = System.TimeSpan::FromSeconds(any2Int(_value));
+    return v;
+}
+case Types::UtcDateTime:
+{
+    utcdatetime v = _value;
+    return new System.DateTime(
+                        DateTimeUtil::year(v), DateTimeUtil::month(v), DateTimeUtil::day(v),
+                        DateTimeUtil::hour(v), DateTimeUtil::minute(v), DateTimeUtil::second(v),
+                        System.DateTimeKind::Utc);
+}
+
+        }
+        return null;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>Serialize</Name>
+				<Source><![CDATA[
+    abstract str Serialize(Common _table)
+    {
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>jsonSerialize</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Main entry point for the serializer. Serialize the given tabular
+    /// object (i.e. table, view or map) into JSON.
+    /// </summary>
+    /// <param name = "_table">The tablular object to serialize into JSON</param>
+    /// <returns>The JSON string repreenting the table.</returns>
+    public static str jsonSerialize (Common _table)
+    {
+        JObject jsonRoot = null;
+        DictTable dt = new DictTable(_table.TableId);
+        if (dt.isView())
+        {
+            return new JsonViewSerializer().Serialize(_table);
+        }
+        else if (dt.isMap())
+        {
+            return new JsonMapSerializer().Serialize(_table);
+        }
+        //else if (dt.isDataEntity())
+        //{
+            // JsonSerializer::jsonSerializeDataEntity(_table);
+        //}
+        else
+        {
+            return new JsonTableSerializer().Serialize(_table);
+        }
+
+        return '';
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

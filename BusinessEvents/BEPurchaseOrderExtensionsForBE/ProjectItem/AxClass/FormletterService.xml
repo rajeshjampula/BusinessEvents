@@ -1,0 +1,2532 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>FormletterService</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+/// <summary>
+/// The <c>FormletterService</c> class is the class that is used when updating sales orders, purchase
+/// orders, and requests for quotes.
+/// </summary>
+class FormletterService
+    extends SysOperationServiceBase
+{
+    //Parm
+    container               packedFormletter;
+    FormletterType          formletterType;
+    LedgerVoucher           ledgerVoucher;
+    ProjProposalJour        projProposalJour;
+    DocumentStatus          documentStatus;
+    Common                  journal;
+    //Formletter
+    FormLetter              formLetter;
+    ParmId                  parmId;
+    boolean                 proforma;
+    str                     labelOrderId;
+    Object                  totals;
+
+    //Date time control
+    StartDateTime           startDateTimeUpdate;
+    StartDateTime           startDateTimeTable;
+
+    //Maps
+    FormletterParmUpdate    formletterParmUpdate;
+    FormletterParmTable     formletterParmTable;
+
+    Set                     allJournalsList;
+    Set                     ordersPosted;
+    Set                     journalList;
+    Set                     proformaJournalList;
+    boolean                 currentParmTableOnHold;
+
+    List                    journalLineList;
+
+    //Num and Voucher
+    NumberSeq               numberSeq;
+
+    // <GEERU>
+    Set                     facturesCreated;
+    #ISOCountryRegionCodes
+    // </GEERU>
+    FormletterJournalCreate formletterJournalCreate;
+    container               formletterProformaPrintPacked;
+
+    //Formletter data contract
+    FormLetterContract      formLetterContract;
+    FormletterOutputContract outputContract;
+
+    // The packing box name will be put on the
+    // inventPickingListJour later in initJournal() (on the
+    // SalesFormLetter_PickingList class).
+    MCRPackingBoxName        MCRPackingBoxName;
+
+    // Per journal list of docuRefs to print
+    Map                     docuRefRecIdsPerJournalMap;
+    boolean                 endBatchPrintFlag;
+
+    // Mark if the records related to VendPurchOrderJournal should be removed
+    boolean                 removeProformaRelated;
+
+    // <GTE>
+    FormletterJournalPost   formLetterJournalPostGTE;
+    // </GTE>
+
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>parmEndBatchPrintFlag</Name>
+				<Source><![CDATA[
+    public boolean parmEndBatchPrintFlag(boolean _endBatchPrintFlag = endBatchPrintFlag)
+    {
+        endBatchPrintFlag = _endBatchPrintFlag;
+        return endBatchPrintFlag;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmRemoveProformaRelated</Name>
+				<Source><![CDATA[
+    public boolean parmRemoveProformaRelated(boolean _removeProformaRelated = removeProformaRelated)
+    {
+        removeProformaRelated = _removeProformaRelated;
+        return removeProformaRelated;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>batchMessage</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Adds a message to the Infolog when the <c>FormletterService</c> class in the batch framework is
+    /// used.
+    /// </summary>
+    /// <param name="_multiThreadDisabled">
+    /// A Boolean value that indicates whether the information message is called when the multithreading
+    /// feature is used.
+    /// </param>
+    /// <remarks>
+    /// The message can be found in the log for the batch task by calling the <c>FormletterService</c>
+    /// class.
+    /// </remarks>
+    protected void batchMessage(boolean _multiThreadDisabled)
+    {
+        boolean existsBatchJobId;
+        if (this.runningAsService())
+        {
+            existsBatchJobId = formLetterContract.parmBatchJobId() ? true : false;
+        }
+        else
+        {
+            existsBatchJobId = formLetter.parmBatchJobId() ? true : false;
+        }
+
+        if (existsBatchJobId)
+        {
+            if (_multiThreadDisabled)
+            {
+                info("@SYS119229");
+            }
+            else
+            {
+                info("@SYS310707");
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>continueSelect</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Indicates whether the selection of the <c>FormletterParmTable</c> records should continue.
+    /// </summary>
+    /// <returns>
+    ///    true if the selection of the <c>FormletterParmTable</c> records should continue; otherwise, false.
+    /// </returns>
+    /// <remarks>
+    ///    The selection stops when no more of the <c>FormletterParmTable</c> records can be found.
+    /// </remarks>
+    protected boolean continueSelect()
+    {
+        next formletterParmTable;
+        return formletterParmTable.RecId != 0;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    creates a journal by using the <c>FormletterJournalCreate</c> class hierarchy.
+    /// </summary>
+    /// <param name="_parmTable">
+    ///    The parameter table for which to post the journal.
+    /// </param>
+    protected void createJournal(Common _parmTable)
+    {
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formletterJournalCreate = formLetterTypeInstance.formLetterJournalCreate(this, _parmTable);
+            if (formletterJournalCreate)
+            {
+                formletterJournalCreate.parmTotals(totals);
+                formletterJournalCreate.run();
+                journal = formletterJournalCreate.getJournal();
+                numberSeq = formletterJournalCreate.getNumberSeq();
+                totals  = formletterJournalCreate.parmTotals();
+
+                if (!journalLineList)
+                {
+                    journalLineList = new List(Types::Record);
+                }
+
+                if (formletterJournalCreate.getJournalLines())
+                {
+                    journalLineList = List::merge(journalLineList,formletterJournalCreate.getJournalLines() );
+                }
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createJournalPost</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Creates an instance of the <c>FormletterJournalPost</c> class.
+    /// </summary>
+    /// <param name="_parmTable">
+    /// A parameter table record.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterJournalPost</c> class.
+    /// </returns>
+    protected FormletterJournalPost createJournalPost(Common _parmTable)
+    {
+        FormletterJournalPost           formletterJournalPost;
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formletterJournalPost = formLetterTypeInstance.formletterJournalPost(this, _parmTable);
+            if (formletterJournalPost)
+            {
+                formletterJournalPost.parmPostingInBatch(this.getBatchJobId());
+
+                return formletterJournalPost;
+            }
+        }
+
+        throw error(Error::wrongUseOfFunction(funcName()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createJournalPrint</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Creates an instance of the <c>FormletterJournalPrint</c> class.
+    /// </summary>
+    /// <returns>
+    /// An instance of the <c>FormletterJournalPrint</c> class.
+    /// </returns>
+    protected FormletterJournalPrint createJournalPrint()
+    {
+        FormletterJournalPrint  formletterJournalPrint;
+
+        formletterJournalPrint = FormletterJournalPrint::newFromFormletterContract(formLetterContract);
+        formletterJournalPrint.parmFormletterProformaPrintPacked(formletterProformaPrintPacked);
+
+        return formletterJournalPrint;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createParmData</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Creates the records on which to base the posting by using the <c>FormletterParmData</c> class
+    /// hierarchy.
+    /// </summary>
+    protected void createParmData()
+    {
+        formletterParmData formletterParmData;
+
+        Microsoft.Dynamics.Application.Instrumentation.ApplicationEventSource::EventWriteFormLetterParmDataCreateStart(classId2Name(classidget(this)));
+        
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formletterParmData = formLetterTypeInstance.formletterParmData(this);
+            if (formletterParmData)
+            {
+                formletterParmData.parmShowQueryForm(false);
+                formletterParmData.createData(true);
+
+                // After the data is created, split data if necessary (e.g., for ship alone or box splitting features)
+                formletterParmData.mcrSplitData();
+            }
+        }
+
+        Microsoft.Dynamics.Application.Instrumentation.ApplicationEventSource::EventWriteFormLetterParmDataCreateStop(classId2Name(classidget(this)));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>endParmUpdate</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Updates the <c>formletterParmUpdate</c> record with end date time results.
+    /// </summary>
+    protected void endParmUpdate()
+    {
+        if (formletterParmUpdate.TableId != tableNum(FormletterParmUpdate)) //Ensure that the map is initialized
+        {
+            ttsbegin;
+            select firstonly forupdate formletterParmUpdate
+                where formletterParmUpdate.ParmId == parmId;
+
+            if (formletterParmUpdate)
+            {
+                if (proforma)
+                {
+                    formletterParmUpdate.delete();
+                }
+                else
+                {
+                    formletterParmUpdate.StartDateTime   = startDateTimeUpdate;
+                    formletterParmUpdate.EndDateTime     = this.getDateTimeNow();
+                    formletterParmUpdate.update();
+                }
+            }
+            ttscommit;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>endPosting</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Ends the posting of the selected <c>FormletterParmTable</c> records.
+    /// </summary>
+    /// <param name="_printout">
+    ///    A <c>Printout</c> enumeration value that indicates when the process reports for created journals
+    ///    should be printed.
+    /// </param>
+    protected void endPosting(Printout _printout)
+    {
+        this.endParmUpdate();
+
+        if (_printout == Printout::After)
+        {
+            this.printOut();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>endpostingMultithread</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Ends the posting.
+    /// </summary>
+    /// <remarks>
+    /// This method is designed for use when you are using posting in batch and multithreading is enabled.
+    /// </remarks>
+    public void endpostingMultithread()
+    {
+        Printout printout;
+
+        this.initFormletter();
+
+        select firstonly formletterParmUpdate
+          where formletterParmUpdate.ParmId == parmId;
+
+        if (this.runningAsService())
+        {
+            printout = formLetterContract.parmPrintOut();
+        }
+        else
+        {
+            printout = formLetter.printout();
+        }
+
+        this.endPosting(printout);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>fillOutputContract</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Fills the output data contract with values.
+    /// </summary>
+    private void fillOutputContract()
+    {
+        outputContract.parmNumberOfOrdersPosted(ordersPosted ? ordersPosted.elements() : 0);
+        outputContract.parmJournal(journal);
+        if (journalLineList)
+        {
+            outputContract.parmJournalLines(SysOperationHelper::base64Encode(journalLineList.pack()));
+        }
+        if (allJournalsList)
+        {
+            outputContract.parmAllJournals(SysOperationHelper::base64Encode(allJournalsList.pack()));
+        }
+
+        // <GEERU>
+        if (facturesCreated)
+        {
+            outputContract.parmFactureJournals_RU(SysOperationHelper::base64Encode(facturesCreated.pack()));
+        }
+        // </GEERU>
+
+        // Pack docuRefRecIdsPerJournalMap into container into str and add to contract
+        outputContract.parmDocuRefRecIdsPerJournal(SysOperationHelper::base64Encode(docuRefRecIdsPerJournalMap.pack()));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getDateTimeNow</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets the current date and time.
+    /// </summary>
+    /// <returns>
+    /// The current date and time.
+    /// </returns>
+    protected StartDateTime getDateTimeNow()
+    {
+        return DateTimeUtil::newDateTime(DateTimeUtil::getSystemDate(DateTimeUtil::getUserPreferredTimeZone()),DateTimeUtil::getTimeNow(DateTimeUtil::getUserPreferredTimeZone()),DateTimeUtil::getUserPreferredTimeZone());
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getFormletter</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets an instance of the <c>FormLetter</c> class.
+    /// </summary>
+    /// <returns>
+    /// An instance of the <c>FormLetter</c> class.
+    /// </returns>
+    public FormLetter getFormletter()
+    {
+        return formLetter;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getNumberOfOrdersPosted</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets the number of orders that have been posted.
+    /// </summary>
+    /// <returns>
+    /// The number of orders that have been posted.
+    /// </returns>
+    public Counter getNumberOfOrdersPosted()
+    {
+        return outputContract.parmNumberOfOrdersPosted();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getOutputContract</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets an instance of the <c>FormLetterOutputContract</c> class.
+    /// </summary>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    public FormletterOutputContract getOutputContract()
+    {
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>handleError</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Handles any errors that are thrown during the posting.
+    /// </summary>
+    /// <param name="_logText">
+    /// An error message.
+    /// </param>
+    /// <param name="_formletterParmTable">
+    /// A <c>FormletterParmTable</c> record.
+    /// </param>
+    private void handleError(
+        LogText             _logText,
+        FormletterParmTable _formletterParmTable)
+    {
+        FormletterJournalPost       formletterJournalPost;
+
+        if (journal.RecId)
+        {
+            this.removeProforma();
+            this.removeJournalFromList();
+        }
+
+        ttsbegin;
+        formletterJournalPost = this.createJournalPost(_formletterParmTable);
+        this.updateParmTableJobStatusError(_formletterParmTable, _logText);
+        // post failed should always be the last action performed during the exception handling
+        formletterJournalPost.postFailed(_logText);
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initDocuRefRecIdsPerJournalMap</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes docuRefRecIdsPerJournalMap.
+    /// </summary>
+    protected void initDocuRefRecIdsPerJournalMap()
+    {
+        docuRefRecIdsPerJournalMap = new Map(typeName2Type(extendedTypeStr(recId)), Types::Class);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initFormletter</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes internal <c>formletter</c> variables.
+    /// </summary>
+    protected void initFormletter()
+    {
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formletterParmUpdate = formLetterTypeInstance.formletterParmUpdate(this);
+        }
+
+        if (this.runningAsService())
+        {
+            parmId      = formLetterContract.parmParmId();
+            proforma    = formLetterContract.parmProforma();
+        }
+        else
+        {
+            parmId      = formLetter.parmId();
+            proforma    = formLetter.proforma();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initFormletterParmMaps</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes internal <c>formletter</c> map variables.
+    /// </summary>
+    protected void initFormletterParmMaps()
+    {
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formletterParmTable = formLetterTypeInstance.initFormletterParmMaps(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initFormletterParmTable</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Initiates the selection of <c>FormletterParmTable</c> records over which to loop.
+    /// </summary>
+    protected void initFormletterParmTable()
+    {
+        formletterParmTable.selectForUpdate(true);
+        select nofetch formletterParmTable
+            where formletterParmTable.ParmId        == parmId
+               && formletterParmTable.ParmJobStatus == ParmJobStatus::Waiting;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>initJournalList</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes internal journal list variables.
+    /// </summary>
+    protected void initJournalList()
+    {
+        journalList = new Set(Types::Record);
+        proformaJournalList = new Set(Types::Record);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isParallelismEnabled</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Indicates whether the parallelism feature is being used.
+    /// </summary>
+    /// <returns>
+    /// true if the parallelism feature is being used; otherwise, false.
+    /// </returns>
+    protected boolean isParallelismEnabled()
+    {
+        FormletterServiceBatchTaskManager  formletterServiceBatchTaskManager;
+        boolean existBatchJobId = this.getBatchJobId();
+
+        if (existBatchJobId)
+        {
+            formletterServiceBatchTaskManager = FormletterServiceBatchTaskManager::newFormletterService(formLetter,
+                                                                                            this.parmDocumentStatus(),
+                                                                                            this.parmFormletterType(),
+                                                                                            this.numberOfJournalsToPost(),
+                                                                                            this.runningAsService(),
+                                                                                            formLetterContract);
+            return formletterServiceBatchTaskManager.createTasks();
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>isPrintingInAfterOperation</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Indicates whether printing is occurring in the after operation.
+    /// </summary>
+    /// <returns>
+    /// true if printing is occurring in the after operation; otherwise, false.
+    /// </returns>
+    private boolean isPrintingInAfterOperation()
+    {
+        if (this.runningAsService() && !proforma)
+        {
+            return formLetterContract.parmIsPrintingInAfterOperation();
+        }
+        else
+        {
+            return false;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>mcrSetPackingBoxName</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Sets the <c>MCRPackingBoxName</c>, which will be put on the <c>InventPickingListJour</c>
+    /// later in the <c>InitJournal</c> on the sales form letter picking list class.
+    /// </summary>
+    private void mcrSetPackingBoxName()
+    {
+        MCRPackingBoxName = formletterParmTable.MCRPackingBoxName;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>mustCreateParmData</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Indicates whether the <c>FormletterService</c> class must create data for selection.
+    /// </summary>
+    /// <returns>
+    ///    true if the <c>FormletterService</c> class must create data for selection; otherwise, false.
+    /// </returns>
+    protected boolean mustCreateParmData()
+    {
+        boolean existLateSelection;
+
+        if (this.runningAsService())
+        {
+            existLateSelection = formLetterContract.parmLateSelection();
+        }
+        else
+        {
+            existLateSelection = formLetter.lateSelection();
+        }
+
+        return existLateSelection;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+    protected void new()
+    {
+        outputContract = FormletterOutputContract::construct();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>numberOfJournalsToPost</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Calculates the number of journals to post.
+    /// </summary>
+    /// <returns>
+    /// The number of journals to post.
+    /// </returns>
+    private int numberOfJournalsToPost()
+    {
+        select count(RecId) from formletterParmTable
+                  where formletterParmTable.ParmId        == parmId
+                     && formletterParmTable.ParmJobStatus == ParmJobStatus::Waiting;
+
+        return int642int(formletterParmTable.RecId);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>packedContract</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Packs the <c>FormletterContract</c> class.
+    /// </summary>
+    /// <returns>
+    /// A container that contains a packed version of the <c>FormletterContract</c> class.
+    /// </returns>
+    private container packedContract()
+    {
+        return formLetterContract.pack();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>packedJournalList_RU</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Returns <c>List</c> of posted journals packed to container
+    /// </summary>
+    /// <returns>
+    /// <c>List</c> of posted journals packed to container
+    /// </returns>
+    public container packedJournalList_RU()
+    {
+        return allJournalsList.pack();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmJournal</Name>
+				<Source><![CDATA[
+    public Common parmJournal()
+    {
+        return journal;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmProforma</Name>
+				<Source><![CDATA[
+    public boolean parmProforma()
+    {
+        return proforma;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmTotals</Name>
+				<Source><![CDATA[
+    public Object parmTotals()
+    {
+        return totals;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmDocumentStatus</Name>
+				<Source><![CDATA[
+    public DocumentStatus parmDocumentStatus(DocumentStatus _documentStatus = documentStatus)
+    {
+        if (this.runningAsService())
+        {
+            documentStatus = formLetterContract.getDocumentStatus();
+        }
+        else
+        {
+            documentStatus = _documentStatus;
+        }
+        return documentStatus;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmLabelOrderId</Name>
+				<Source><![CDATA[
+    public str parmLabelOrderId(str _labelOrderId = labelOrderId)
+    {
+        labelOrderId =_labelOrderId;
+        return labelOrderId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmFormLetter</Name>
+				<Source><![CDATA[
+    public FormLetter parmFormLetter(FormLetter _formLetter = formLetter)
+    {
+        formLetter =_formLetter;
+        return formLetter;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmFormLetterContract</Name>
+				<Source><![CDATA[
+    public FormLetterContract parmFormLetterContract(FormLetterContract _formLetterContract = formLetterContract)
+    {
+        formLetterContract =_formLetterContract;
+        return formLetterContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmFormletterType</Name>
+				<Source><![CDATA[
+    public FormletterType parmFormletterType(FormletterType _formletterType = formletterType)
+    {
+        if (this.runningAsService())
+        {
+            formletterType = formLetterContract.getFormLetterType();
+        }
+        else
+        {
+            formletterType = _formletterType;
+        }
+        return formletterType;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmLedgerVoucher</Name>
+				<Source><![CDATA[
+    public LedgerVoucher parmLedgerVoucher(LedgerVoucher _ledgerVoucher = ledgerVoucher)
+    {
+        ledgerVoucher = _ledgerVoucher;
+        return ledgerVoucher;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmPackedFormletter</Name>
+				<Source><![CDATA[
+    public container parmPackedFormletter(container _packedFormletter = packedFormletter)
+    {
+        packedFormletter = _packedFormletter;
+        return packedFormletter;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>parmProjProposalJour</Name>
+				<Source><![CDATA[
+    //Posting sales invoice from project
+    public ProjProposalJour parmProjProposalJour(ProjProposalJour _projProposalJour = projProposalJour)
+    {
+        projProposalJour = _projProposalJour;
+        return projProposalJour;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Posts a journal by using the <c>FormletterJournalPost</c> class hierarchy.
+    /// </summary>
+    /// <param name="_parmTable">
+    ///    The parameter table for which to post the journal.
+    /// </param>
+    /// <returns>
+    ///    The <c>FormletterJournalPost</c> class of the journal that was posted; otherwise, null.
+    /// </returns>
+    protected FormletterJournalPost postJournal(Common _parmTable)
+    {
+        FormletterJournalPost           formletterJournalPost;
+        SalesFormLetterInvoiceProjectContract  salesFormLetterInvoiceProjectContract;
+
+        formletterJournalPost = this.createJournalPost(_parmTable);
+
+        if (formletterJournalPost)
+        {
+            if (formLetterContract is SalesFormLetterInvoiceProjectContract)
+            {
+                salesFormLetterInvoiceProjectContract = formLetterContract as SalesFormLetterInvoiceProjectContract;
+                formletterJournalPost.parmProjProposalJour(salesFormLetterInvoiceProjectContract.parmSourceTable());
+            }
+
+            if (this.parmLedgerVoucher())
+            {
+                formletterJournalPost.setLedgerVoucher(this.parmLedgerVoucher());
+                if (this.runningAsService())
+                {
+                    formletterJournalPost.setNumAndVoucher([formLetterContract.parmNumber(), formLetterContract.parmVoucher()]);
+                }
+                else
+                {
+                    formletterJournalPost.setNumAndVoucher(formLetter.getNumAndVoucher());
+                }
+            }
+            else
+            {
+                formletterJournalPost.parmNumberSeq(numberSeq);
+            }
+
+            formletterJournalPost.run();
+
+            if (!this.runningAsService())
+            {
+                //Post updated internal variables in formletter when not running as a service
+                formLetter = formletterJournalPost.parmFormletter();
+            }
+
+            currentParmTableOnHold = formletterJournalPost.isOnHold();
+            formletterProformaPrintPacked = formletterJournalPost.getFormletterProformaPrintPacked();
+            ordersPosted = Set::union(ordersPosted, formletterJournalPost.getOrdersPosted());
+            docuRefRecIdsPerJournalMap.insert(journal.RecId,formletterJournalPost.parmDocuRefRecId());
+
+            // <GEERU>
+            if (SysCountryRegionCode::isLegalEntityInCountryRegion([#isoRU]) &&
+                this.parmDocumentStatus() == DocumentStatus::Facture_RU)
+            {
+                if (!facturesCreated)
+                {
+                    facturesCreated = new Set(Types::Record);
+                }
+
+                facturesCreated.add(formletterJournalPost.factureJour_RU());
+            }
+            // </GEERU>
+        }
+
+        return formletterJournalPost;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderApproval</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order approval.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterApprovalContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderApproval(PurchFormLetterApprovalContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderBOE_IN</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Method initiates the Posting of BillOfEntry.
+    /// </summary>
+    /// <param name="_contract">
+    ///    The _contract used for posting the BillOfEntry
+    /// </param>
+    /// <returns>
+    ///    FormletterOutputContract contractor object.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderBOE_IN(PurchFormLetterBOEContract_IN _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderConfirmation</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order confirmation.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterPurchOrderContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderConfirmation(PurchFormLetterPurchOrderContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderConfirmationRequest</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order confirmation request.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormLetterConfirmRequestContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderConfirmationRequest(PurchFormLetterConfirmRequestContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderFacture_RU</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Operation to post a purchase order invoice with facture.
+    /// </summary>
+    /// <param name="_contract">
+    ///   An instance of the <c>PurchFormLetterFactureContract_RU</c> class.
+    /// </param>
+    /// <returns>
+    ///   An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderFacture_RU(PurchFormLetterFactureContract_RU _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderInvoice</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order invoice.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterInvoiceContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderInvoice(PurchFormLetterInvoiceContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderPackingSlip</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order packing slip.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterPackingSlipContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderPackingSlip(PurchFormLetterPackingSlipContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderReceiptList</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a purchase order receipt list.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterReceiptListContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderReceiptList(PurchFormLetterReceiptsListContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchaseOrderSAD</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Operation to post a purchase order invoice via SAD.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchFormletterSADContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchaseOrderSAD(PurchFormLetterSADContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postPurchOrderInvoice4Paym_RU</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Operation to post a purchase order invoice for payment
+    /// </summary>
+    /// <param name="_contract">
+    ///   An instance of the <c>PurchFormLetterInvoice4PaymContract_RU</c> class.
+    /// </param>
+    /// <returns>
+    ///   An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postPurchOrderInvoice4Paym_RU(PurchFormLetterInvoice4PaymContract_RU _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRemoveProformaNotJournal_BR</Name>
+				<Source><![CDATA[
+    private void postRemoveProformaNotJournal_BR(Common _proformaJournal)
+    {
+        FiscalDocument_BR   fiscalDocument;
+
+        delete_from fiscalDocument
+            where fiscalDocument.RefRecId == _proformaJournal.RecId
+                && fiscalDocument.RefTableId == _proformaJournal.TableId;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postReplenishmentOrderProductReceipt</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a replenishment order product receipt.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>ConsignmentReplenishmentOrderFormletterProductReceiptContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postReplenishmentOrderProductReceipt(ConsignmentReplenishmentOrderFormletterProductReceiptContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRequestForQuoteAccept</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a request for a quote accept.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchRFQFormLetterAcceptContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postRequestForQuoteAccept(PurchRFQFormLetterAcceptContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRequestForQuoteReject</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a request for a quote reject.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchRFQFormLetterRejectContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postRequestForQuoteReject(PurchRFQFormLetterRejectContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRequestForQuoteReSend</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a request for a quote resend.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchRFQFormLetterReSendContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postRequestForQuoteReSend(PurchRFQFormLetterReSendContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRequestForQuoteSend</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a request for a quote send.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>PurchRFQFormLetterSendContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postRequestForQuoteSend(PurchRFQFormLetterSendContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesFreeTextInvoice</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a sales free text invoice.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterFreeTextContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesFreeTextInvoice(SalesFormLetterFreeTextContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderConfirmation</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a sales order confirmation.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterConfirmContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderConfirmation(SalesFormLetterConfirmContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderDeliverySlip_BR</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Operation to post a sales order delivery slip.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormLetterDlvSlipContract_BR</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderDeliverySlip_BR(SalesFormLetterDlvSlipContract_BR _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderDeliverySlipProject_BR</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Operation to post a sales order delivery slip.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormLetterDlvSlipProjectContract_BR</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderDeliverySlipProject_BR(SalesFormLetterDlvSlpProjContract_BR _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderFacture_RU</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Operation to post a sales order invoice with facture.
+    /// </summary>
+    /// <param name="_contract">
+    ///   An instance of the <c>SalesFormLetterFactureContract_RU</c> class.
+    /// </param>
+    /// <returns>
+    ///   An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderFacture_RU(SalesFormLetterFactureContract_RU _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderInvoice</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a sales order invoice.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterInvoiceContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderInvoice(SalesFormLetterInvoiceContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderInvoice4Paym_RU</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Operation to post a sales order invoice for payment.
+    /// </summary>
+    /// <param name="_contract">
+    ///   An instance of the <c>SalesFormLetterInvoice4PaymContract_RU</c> class.
+    /// </param>
+    /// <returns>
+    ///   An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderInvoice4Paym_RU(SalesFormLetterInvoice4PaymContract_RU _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderInvoiceProject</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a project sales order invoice.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterInvoiceProjectContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderInvoiceProject(SalesFormLetterInvoiceProjectContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderPackingSlip</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a sales order packing slip.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterPackingSlipContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderPackingSlip(SalesFormLetterPackingSlipContract _contract)
+    {
+        formLetterContract = _contract as FormLetterContract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderPackingSlipProject</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a project sales order packing slip.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterPackingSlipProjContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderPackingSlipProject(SalesFormLetterPackingSlipProjContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderPickingList</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Posts a sales order picking list.
+    /// </summary>
+    /// <param name="_contract">
+    /// An instance of the <c>SalesFormletterPickingListContract</c> class.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterOutputContract</c> class.
+    /// </returns>
+    FormletterOutputContract postSalesOrderPickingList(SalesFormLetterPickingListContract _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postSalesOrderShippingBill_IN</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Method initiates the Posting of ShippingBill.
+    /// </summary>
+    /// <param name="_contract">
+    ///    The _contract used for posting the ShippingBill
+    /// </param>
+    /// <returns>
+    ///    FormletterOutputContract contractor object.
+    /// </returns>
+    FormletterOutputContract postSalesOrderShippingBill_IN(SalesFormLetterShipBillContract_IN _contract)
+    {
+        formLetterContract = _contract;
+        this.run();
+        return outputContract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>prefixParmTable</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Determines the prefix to use in the Infolog.
+    /// </summary>
+    /// <param name="_parmTable">
+    /// A <c>FormletterParmTable</c> record.
+    /// </param>
+    /// <returns>
+    /// A string that has the prefix to use.
+    /// </returns>
+    protected str prefixParmTable(FormletterParmTable _parmTable)
+    {
+        str prefix;
+        
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            prefix = formLetterTypeInstance.infologPrefixParmTable(_parmTable);
+        }
+
+        return prefix;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>printJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Prints the reports for the created journals.
+    /// </summary>
+    protected void printJournal()
+    {
+        FormletterJournalPrint  formletterJournalPrint;
+        CompanyId               companyId;
+
+        boolean                countryRegion_RU = SysCountryRegionCode::isLegalEntityInCountryRegion([#isoRU]);
+
+        if (journalList.elements() > 0)
+        {
+            companyId = curext();
+            if (this.runningAsService())
+            {
+                if (formLetterContract.isPrinting()
+                    // <GEERU>
+                    || (countryRegion_RU
+                        && (formLetterContract.parmPrintAcceptanceReport_RU()
+                        ||  formLetterContract.parmPrintInventBaileeReport_RU()
+                        ||  formLetterContract.parmPrintBillOfLading_RU()
+                        ||  formLetterContract.parmPrintTransportInvoice_RU()))
+                    // </GEERU>
+                    // <GIN>
+                     || (TaxParameters::checkTaxParameters_IN()
+                        && formLetterContract.parmPrintGRN_IN())
+                     || (TaxParameters::isExciseEnable_IN() && formLetterContract.parmPrintExciseFormletter_IN())
+                    // </GIN>
+                    )
+                {
+                    formletterJournalPrint = this.createJournalPrint();
+                    formletterJournalPrint.printJournal(journalList);
+                }
+            }
+            else
+            {
+                // <GEERU>
+                if (formLetter.printFormLetter()
+                    || (countryRegion_RU
+                        && (formLetter.parmPrintFacture_RU()
+                            || formLetter.parmPrintBillOfLading_RU()
+                            || formLetter.parmPrintAcceptanceReport_RU()
+                            || formLetter.parmPrintInventBaileeReport_RU())))
+                // </GEERU>
+                {
+                    formLetter.printJournal(journalList);
+                }
+
+                 // <GIN>
+                else if (TaxParameters::checkTaxParameters_IN() && formLetter.printGRN_IN())
+                {
+                    formLetter.printJournal(journalList);
+                }
+                 // </GIN>
+            }
+            if (companyId != curext())
+            {
+                appl.setDefaultCompany(companyId, false);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>printOut</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Prints the journals.
+    /// </summary>
+    /// <remarks>
+    /// Printing is only invoked if printing is not going to occur in the after operation.
+    /// </remarks>
+    protected void printOut()
+    {
+        if (!this.isPrintingInAfterOperation() || this.parmEndBatchPrintFlag())
+        {
+            this.parmRemoveProformaRelated(true);
+            this.printJournal();
+            this.removeProforma();
+            this.initJournalList();
+            this.parmEndBatchPrintFlag(false);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>reArrange</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Performs the rearrange of data.
+    /// </summary>
+    private void reArrange()
+    {
+        var formLetterTypeInstance = FormletterTypeBase::singletonFromFormletterType(this.parmFormletterType());
+        if (formLetterTypeInstance)
+        {
+            formLetterTypeInstance.formLetterContractDataRearrange(this);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>removeJournalFromList</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Removes a journal from the internal journal lists.
+    /// </summary>
+    protected void removeJournalFromList()
+    {
+        if (journalList.in(journal))
+        {
+            journalList.remove(journal);
+        }
+
+        if (allJournalsList.in(journal))
+        {
+            allJournalsList.remove(journal);
+        }
+
+        if (proformaJournalList.in(journal))
+        {
+            proformaJournalList.remove(journal);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>removeProforma</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///    Performs the necessary cleanup after proforma posting.
+    /// </summary>
+    protected void removeProforma()
+    {
+        Common          proformaJournal;
+        SetEnumerator   se;
+
+        if (proformaJournalList && proformaJournalList.elements() > 0)
+        {
+            se = proformaJournalList.getEnumerator();
+            while (se.moveNext())
+            {
+                ttsbegin;
+                proformaJournal = se.current();
+                // <GSA>
+                if (SysCountryRegionCode::isLegalEntityInCountryRegion([#isoSA]))
+                {
+                    proformaJournal.reread();
+                }
+                // </GSA>
+                proformaJournal.selectForUpdate(true);
+                this.removeProformaNotJournal(proformaJournal);
+                proformaJournal.delete();
+                ttscommit;
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>removeProformaNotJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Performs the necessary cleanup of journal related data after pro forma posting.
+    /// </summary>
+    /// <param name="_proformaJournal">
+    /// A journal header record.
+    /// </param>
+    [HookableAttribute(true)]
+    protected void removeProformaNotJournal(Common _proformaJournal)
+    {
+        ProjInvoiceEmpl             projInvoiceEmpl;
+        ProjInvoiceItem             projInvoiceItem;
+        ProjInvoiceRevenue          projInvoiceRevenue;
+        ProjInvoiceOnAcc            projInvoiceOnAcc;
+        ProjInvoiceCost             projInvoiceCost;
+        ProjInvoiceJour             projInvoiceJour;
+        // <GEERU>
+        boolean                     countryRegion_RU = SysCountryRegionCode::isLegalEntityInCountryRegion([#isoRU]);
+        // </GEERU>
+        // <GEECZ>
+        boolean                     countryRegion_CZ = SysCountryRegionCode::isLegalEntityInCountryRegion([#isoCZ]);
+        // </GEECZ>
+        VendInvoiceJour             vendInvoiceJour;
+        VendInvoiceTrans            vendInvoiceTrans;
+        VendPurchOrderJour          vendPurchOrderJour;
+        PurchPurchaseOrderHeader    localPurchPurchaseOrderHeader;
+        PurchPurchaseOrderTmp       localPurchPurchaseOrderTmp;
+
+        if (_proformaJournal.TableId == tableNum(ProjInvoiceJour))
+        {
+            projInvoiceJour = _proformaJournal;
+
+            // <GEECZ>
+            if (countryRegion_CZ
+                &&  projInvoiceJour.isCreditNote_CZ())
+            {
+                this.updateOriginalReference_CZ(projInvoiceJour);
+            }
+            // </GEECZ>
+
+            ttsbegin;
+
+            delete_from projInvoiceEmpl
+                      where projInvoiceEmpl.ProjInvoiceId == projInvoiceJour.ProjInvoiceId  &&
+                            projInvoiceEmpl.InvoiceDate   == projInvoiceJour.InvoiceDate;
+
+            delete_from projInvoiceItem
+                      where projInvoiceItem.ProjInvoiceId == projInvoiceJour.ProjInvoiceId    &&
+                            projInvoiceItem.InvoiceDate   == projInvoiceJour.InvoiceDate;
+
+            delete_from projInvoiceRevenue
+                      where projInvoiceRevenue.ProjInvoiceId == projInvoiceJour.ProjInvoiceId    &&
+                            projInvoiceRevenue.InvoiceDate   == projInvoiceJour.InvoiceDate;
+
+            delete_from projInvoiceOnAcc
+                      where projInvoiceOnAcc.ProjInvoiceId == projInvoiceJour.ProjInvoiceId    &&
+                            projInvoiceOnAcc.InvoiceDate   == projInvoiceJour.InvoiceDate;
+
+            delete_from projInvoiceCost
+                      where projInvoiceCost.ProjInvoiceId == projInvoiceJour.ProjInvoiceId    &&
+                            projInvoiceCost.InvoiceDate   == projInvoiceJour.InvoiceDate;
+
+            ttscommit;
+        }
+
+        // <GEERU>
+        if (countryRegion_RU
+            && _proformaJournal.TableId == tableNum(VendPackingSlipJour))
+        {
+            PrintoutTable_RU::removeProformaSlipsM4M7(_proformaJournal);
+        }
+        // </GEERU>
+
+        if (_proformaJournal.TableId == tableNum(VendInvoiceJour))
+        {
+            // Delete any VendInvoiceTrans records created by advance application lines
+            // Advance application lines use a different InternalInvoiceId (voucher) than the rest of the invoice
+
+            vendInvoiceJour = _proformaJournal;
+
+            // VendInvoiceTrans records with the same InternalInvoiceId will be deleted by the delete action on VendInvoiceJour
+            delete_from vendInvoiceTrans
+                where vendInvoiceTrans.PurchId == vendInvoiceJour.PurchId &&
+                      vendInvoiceTrans.InvoiceId == vendInvoiceJour.InvoiceId &&
+                      vendInvoiceTrans.InvoiceDate == vendInvoiceJour.InvoiceDate &&
+                      vendInvoiceTrans.NumberSequenceGroup == vendInvoiceJour.NumberSequenceGroup &&
+                      vendInvoiceTrans.InternalInvoiceId != vendInvoiceJour.InternalInvoiceId;
+        }
+
+        if (removeProformaRelated && _proformaJournal.TableId == tableNum(VendPurchOrderJour))
+        {
+            vendPurchOrderJour = _proformaJournal;
+
+            delete_from localPurchPurchaseOrderHeader
+                where localPurchPurchaseOrderHeader.JournalRecId         == vendPurchOrderJour.RecId
+                &&    localPurchPurchaseOrderHeader.createdTransactionId == vendPurchOrderJour.createdTransactionId;
+
+            delete_from localPurchPurchaseOrderTmp        //the created data is copied so it should be deleted.
+                where localPurchPurchaseOrderTmp.JournalRecId         == vendPurchOrderJour.RecId
+                &&    localPurchPurchaseOrderTmp.createdTransactionId == vendPurchOrderJour.createdTransactionId;
+
+            removeProformaRelated = false;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>run</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Executes the posting.
+    /// </summary>
+    public void run()
+    {
+        #OCCRetryCount
+
+        Printout                    printout;
+        boolean                     updateError;
+        Counter                     infoLogStartPos;
+        Counter                     infoLogEndPos;
+        LogText                     logText;
+        boolean                     parallelismDisabled;
+        System.Exception            clrException;
+        int                         line;
+
+        // <GEERU>
+        boolean                     countryRegion_RU = SysCountryRegionCode::isLegalEntityInCountryRegion([#isoRU]);
+        // </GEERU>
+
+        infoLogStartPos = infologLine();
+        infoLogStartPos = infoLogStartPos == 0 ? 1 : infoLogStartPos;
+
+        allJournalsList = new Set(Types::Record);
+        ordersPosted    = new Set(Types::String);
+
+        this.initJournalList();
+        this.initFormletterParmMaps();
+        this.initFormletter();
+        this.initDocuRefRecIdsPerJournalMap();
+
+        if (this.runningAsService())
+        {
+            printout = formLetterContract.parmPrintOut();
+        }
+        else
+        {
+            printout = formLetter.printout();
+        }
+        parallelismDisabled = !this.isParallelismEnabled();
+
+        if (parallelismDisabled && this.mustCreateParmData())
+        {
+            this.createParmData();
+            if (!this.isExecutingInBatch())
+            {
+                this.reArrange();
+            }
+        }
+
+        setPrefix("@SYS25781");
+
+        startDateTimeUpdate = this.getDateTimeNow();
+
+        this.initFormletterParmTable();
+
+        if (parallelismDisabled)
+        {
+            while (this.continueSelect())
+            {
+                try
+                {
+                    journal = null;
+                    line = Global::infologLine();
+                    if (!formletterParmTable.RecId)
+                    {
+                        break;
+                    }
+                    formletterJournalCreate = null;
+                    startDateTimeTable = this.getDateTimeNow();
+
+                    this.processJournal(printOut);
+
+                }
+                catch (Exception::Deadlock)
+                {
+                    infolog.clear(line);
+                    this.removeJournalFromList();
+                    retry;
+                }
+                catch (Exception::UpdateConflict)
+                {
+                    if (appl.ttsLevel() == 0)
+                    {
+                        if (xSession::currentRetryCount() >= #RetryNum)
+                        {
+                            throw Exception::UpdateConflictNotRecovered;
+                        }
+                        else
+                        {
+                            this.removeJournalFromList();
+                            retry;
+                        }
+                    }
+                    else
+                    {
+                        throw Exception::UpdateConflict;
+                    }
+                }
+                catch (Exception::DuplicateKeyException)
+                {
+                    if (appl.ttsLevel() == 0)
+                    {
+                        updateError = true;
+                    }
+                    else
+                    {
+                        throw Exception::DuplicateKeyException;
+                    }
+                }
+                catch (Exception::Error)
+                {
+                    updateError = true;
+
+                    infoLogEndPos = infologLine();
+                    logText = Info::infoCon2Str(infolog.copy(infoLogStartPos,infoLogEndPos));
+                    infoLogStartPos = infoLogEndPos+1;
+                    infolog.updateViewSet(this, false);
+
+                    this.handleError(logText, formletterParmTable);
+                }
+                catch (Exception::CLRError)
+                {
+                    updateError = true;
+
+                    clrException = CLRInterop::getLastException();
+                    logText = "@SYS331662"; //Set default error text in case we can't get the last exception.
+                    if (clrException)
+                    {
+                        logText = clrException.get_Message();
+                        ApplicationUnhandledExceptionLogger::logCLRException(clrException);
+                    }
+                    error(logText);
+
+                    this.handleError(logText, formletterParmTable);
+                }
+                catch
+                {
+                    exceptionTextFallThrough();
+                }
+            }
+        }
+        this.fillOutputContract();
+        outputContract.parmUpdateError(updateError);
+
+        infolog.updateViewSet(this, false);
+
+        if (parallelismDisabled)
+        {
+            this.endPosting(printout);
+            if (formLetter)
+            {
+                packedFormletter = formLetter.pack();
+            }
+        }
+
+        this.batchMessage(parallelismDisabled);
+        
+        if (this.isExecutingInBatch())        
+        {
+            if (updateError)
+            {
+                throw error("@SYS78886");
+            }
+        }
+
+        if (isConfigurationkeyEnabled(configurationKeyNum(PublicSector)))
+        {
+            if (allJournalsList.elements() > 0)
+            {
+                PurchTotalsSummaryController::onPostingSuccess(allJournalsList);
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>processJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Creates totals, posts the journal and prints.
+    /// </summary>
+    /// <param name = "_printout">A <c>PrintOut</c> value.</param>
+    protected void processJournal(Printout _printout)
+    {
+        FormletterJournalPost formLetterJournalPost;
+
+        // create totals in isolated transaction scope to facilitate
+        // sharing across async tasks
+        ttsbegin;
+        totals = this.getTotals();
+        ttscommit;
+                    
+        ttsbegin;
+        this.createAndPostJournal();
+        ttscommit;
+
+        //Post tax document in isolated transaction scope to use async tasks.
+        this.postTaxDocument();
+
+        if (_printout == Printout::Current)
+        {
+            this.printOut();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>createAndPostJournal</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Creates the journal if not created and posts the journal.
+    /// </summary>
+    protected void createAndPostJournal()
+    {
+        setPrefix(this.prefixParmTable(formletterParmTable));
+        this.createJournal(formletterParmTable);
+
+        FormletterJournalPost formletterJournalPost;
+        if (journal.RecId)
+        {
+            //Only post the journal if one was created.
+            formletterJournalPost = this.postJournal(formletterParmTable);
+            this.addJournalToLists();
+        }
+        this.updateParmTableJobStatusExecuted(formletterParmTable);
+
+        if (journal.RecId && formletterJournalPost)
+        {
+            //Only do post journal posting if journal was created.
+            formletterJournalPost.postJournalPost();
+
+            this.prepareProforma(formletterJournalPost);
+        }
+
+        formLetterJournalPostGTE = formletterJournalPost;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>addJournalToLists</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Adds the journal to the different lists.
+    /// </summary>
+    protected void addJournalToLists()
+    {
+        journalList.add(journal);
+        if (currentParmTableOnHold || proforma)
+        {
+            proformaJournalList.add(journal);
+        }
+        allJournalsList.add(journal);
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>prepareProforma</Name>
+				<Source><![CDATA[
+    protected void prepareProforma(FormletterJournalPost _formletterJournalPost)
+    {
+        boolean countryRegion_RU = SysCountryRegionCode::isLegalEntityInCountryRegion([#isoRU]);
+        FormletterJournalPrint  formletterJournalPrint;
+
+        if (currentParmTableOnHold || proforma)
+        {
+            //create and use formletterJournalPrint in the same condition as it is done in printJournal()
+            if (this.runningAsService()
+                && (formLetterContract.isPrinting()
+                    || (countryRegion_RU
+                        && (formLetterContract.parmPrintAcceptanceReport_RU()
+                        ||  formLetterContract.parmPrintInventBaileeReport_RU()
+                        ||  formLetterContract.parmPrintBillOfLading_RU()
+                        ||  formLetterContract.parmPrintTransportInvoice_RU()))
+                    || (TaxParameters::checkTaxParameters_IN()
+                        && formLetterContract.parmPrintGRN_IN())
+                        ||(TaxParameters::isExciseEnable_IN() && formLetterContract.parmPrintExciseFormletter_IN())))
+            {
+                formletterJournalPrint = this.createJournalPrint();
+            }
+
+            if (_formletterJournalPost.createReportData(formletterJournalPrint)
+                && ! countryRegion_RU
+                && this.shouldRemoveProforma()
+                // <GSA>
+                && ! SysCountryRegionCode::isLegalEntityInCountryRegion([#isoSA])
+                // </GSA>
+                )
+            {
+                this.removeProforma();
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>shouldRemoveProforma</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Determines if the proforma should be deleted.
+    /// </summary>
+    /// <returns>true, if the proforma should be deleted; otherwise, false.</returns>
+    /// <remarks>This is provided as an extension point.</remarks>
+    protected boolean shouldRemoveProforma()
+    {
+        return true;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>runningAsService</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Determines whether the class is running as a service.
+    /// </summary>
+    /// <returns>
+    /// true if the class is running as a service; otherwise, false.
+    /// </returns>
+    private boolean runningAsService()
+    {
+        return formLetterContract != null;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>setContract</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Sets the internal <c>FormletterContract</c> object.
+    /// </summary>
+    /// <param name="_contract">
+    ///   An instance of the <c>FormletterContract</c> class.
+    /// </param>
+    public void setContract(FormLetterContract _contract)
+    {
+        formLetterContract = _contract;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>setJournalList</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Sets the internal list of journals that are being processed.
+    /// </summary>
+    /// <param name="_journalList">
+    /// A set of journals to process.
+    /// </param>
+    public void setJournalList(Set _journalList)
+    {
+        journalList = _journalList;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>setStartDateTimeUpdate</Name>
+				<Source><![CDATA[
+    /// <summary>
+    ///   Sets the internal start date and time of the posting.
+    /// </summary>
+    /// <param name="_startDateTimeUpdate">
+    ///   A <c>DateTime</c> value.
+    /// </param>
+    public void setStartDateTimeUpdate(StartDateTime _startDateTimeUpdate)
+    {
+        startDateTimeUpdate = _startDateTimeUpdate;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateOriginalReference_CZ</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Update linkes in original trans to correct trans
+    /// </summary>
+    /// <param name="_projInvoiceJour">
+    /// A journal header record.
+    /// </param>
+    private void updateOriginalReference_CZ(ProjInvoiceJour _projInvoiceJour)
+    {
+        ProjInvoiceEmpl         projInvoiceEmpl;
+        ProjInvoiceEmplDetail   projInvoiceEmplDetail;
+        ProjInvoiceEmplDetail   projInvoiceEmplDetailOrig;
+        ProjInvoiceItem         projInvoiceItem;
+        ProjInvoiceItemDetail   projInvoiceItemDetail;
+        ProjInvoiceItemDetail   projInvoiceItemDetailOrig;
+        ProjInvoiceRevenue      projInvoiceRevenue;
+        ProjInvoiceRevenueDetail  projInvoiceRevenueDetail;
+        ProjInvoiceRevenueDetail  projInvoiceRevenueDetailOrig;
+        ProjInvoiceOnAcc        projInvoiceOnAcc;
+        ProjInvoiceOnAccDetail  projInvoiceOnAccDetail;
+        ProjInvoiceOnAccDetail  projInvoiceOnAccDetailOrig;
+        ProjInvoiceCost         projInvoiceCost;
+        ProjInvoiceCostDetail   projInvoiceCostDeatail;
+        ProjInvoiceCostDetail   projInvoiceCostDeatailOrig;
+
+        ttsBegin;
+        update_recordSet projInvoiceEmplDetailOrig
+            setting RefRecId = 0
+            join  projInvoiceEmplDetail
+                where   projInvoiceEmplDetail.RefRecId  == projInvoiceEmplDetailOrig.RecId
+            join  projInvoiceEmpl
+                where   projInvoiceEmpl.RecId   == projInvoiceEmplDetail.InvoiceRefRecId
+                   &&   projInvoiceEmpl.ProjInvoiceId   == _projInvoiceJour.ProjInvoiceId
+                   &&   projInvoiceEmpl.InvoiceDate     == _projInvoiceJour.InvoiceDate;
+
+        update_recordSet projInvoiceItemDetailOrig
+            setting RefRecId = 0
+            join  projInvoiceItemDetail
+                where   projInvoiceItemDetail.RefRecId  == projInvoiceItemDetailOrig.RecId
+            join  projInvoiceItem
+                where   projInvoiceItem.RecId   == projInvoiceItemDetail.InvoiceRefRecId
+                   &&   projInvoiceItem.ProjInvoiceId   == _projInvoiceJour.ProjInvoiceId
+                   &&   projInvoiceItem.InvoiceDate     == _projInvoiceJour.InvoiceDate;
+
+        update_recordSet projInvoiceRevenueDetailOrig
+            setting RefRecId = 0
+            join  projInvoiceRevenueDetail
+                where   projInvoiceRevenueDetail.RefRecId  == projInvoiceRevenueDetailOrig.RecId
+            join  projInvoiceRevenue
+                where   projInvoiceRevenue.RecId   == projInvoiceRevenueDetail.InvoiceRefRecId
+                   &&   projInvoiceRevenue.ProjInvoiceId   == _projInvoiceJour.ProjInvoiceId
+                   &&   projInvoiceRevenue.InvoiceDate     == _projInvoiceJour.InvoiceDate;
+
+        update_recordSet projInvoiceOnAccDetailOrig
+            setting RefRecId = 0
+            join  projInvoiceOnAccDetail
+                where   projInvoiceOnAccDetail.RefRecId  == projInvoiceOnAccDetailOrig.RecId
+            join  projInvoiceOnAcc
+                where   projInvoiceOnAcc.RecId   == projInvoiceOnAccDetail.InvoiceRefRecId
+                   &&   projInvoiceOnAcc.ProjInvoiceId   == _projInvoiceJour.ProjInvoiceId
+                   &&   projInvoiceOnAcc.InvoiceDate     == _projInvoiceJour.InvoiceDate;
+
+        update_recordSet projInvoiceCostDeatailOrig
+            setting RefRecId = 0
+            join  projInvoiceCostDeatail
+                where   projInvoiceCostDeatail.RefRecId  == projInvoiceCostDeatailOrig.RecId
+            join  projInvoiceCost
+                where   projInvoiceCost.RecId   == projInvoiceCostDeatail.InvoiceRefRecId
+                   &&   projInvoiceCost.ProjInvoiceId   == _projInvoiceJour.ProjInvoiceId
+                   &&   projInvoiceCost.InvoiceDate     == _projInvoiceJour.InvoiceDate;
+        ttsCommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateParmTableJobStatusError</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Updates the status to Error on the parameter table record.
+    /// </summary>
+    /// <param name="_formletterParmTable">
+    /// The <c>FormletterParmTable</c> record to update.
+    /// </param>
+    /// <param name="_logText">
+    /// An error message.
+    /// </param>
+    protected void updateParmTableJobStatusError(FormletterParmTable    _formletterParmTable,
+                                                 LogText                _logText)
+    {
+        ProjInvoiceParmTable    projInvoiceParmTable;
+
+        if (_formletterParmTable.TableId != tableNum(ProjInvoiceParmTable))
+        {
+            _formletterParmTable.reread();
+            _formletterParmTable.Log = _logText;
+            _formletterParmTable.updateParmJobStatusContainErrors();
+        }
+        else
+        {
+            projInvoiceParmTable = _formletterParmTable;
+            projInvoiceParmTable.reread();
+            projInvoiceParmTable.ParmJobStatus = ParmJobStatus::ContainErrors;
+            projInvoiceParmTable.update();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>updateParmTableJobStatusExecuted</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Updates the status to be executed on the parameter table record.
+    /// </summary>
+    /// <param name="_formletterParmTable">
+    /// The <c>FormletterParmTable</c> record to update.
+    /// </param>
+    protected void updateParmTableJobStatusExecuted(FormletterParmTable _formletterParmTable)
+    {
+        ProjInvoiceParmTable    projInvoiceParmTable;
+
+        if ((!(formLetterContract != null && formLetterContract.getCheckForHold()) || formletterParmTable.Hold == NoYes::No ) && !proforma)
+        {
+            if (journal.TableId == tableNum(VendInvoiceJour) || journal.TableId == tableNum(CustInvoiceJour) )
+            {
+                _formletterParmTable.reread();
+            }
+
+            if (formletterParmTable.TableId != tableNum(ProjInvoiceParmTable))
+            {
+                _formletterParmTable.StartDateTime = startDateTimeTable;
+                _formletterParmTable.EndDateTime   = this.getDateTimeNow();
+                _formletterParmTable.Log = '';
+                _formletterParmTable.updateParmJobStatusExecuted();
+            }
+            else
+            {
+                projInvoiceParmTable = _formletterParmTable;
+                projInvoiceParmTable.ParmJobStatus = ParmJobStatus::Executed;
+                projInvoiceParmTable.update();
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>construct</Name>
+				<Source><![CDATA[
+    public static FormletterService construct()
+    {
+        return new FormletterService();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>newFormletterService</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes a new instance of the <c>FormletterService</c> class.
+    /// </summary>
+    /// <param name="_packedFormletter">
+    /// A container that contains a packed instance of the <c>Formletter</c> class.
+    /// </param>
+    /// <param name="_documentStatus">
+    /// A <c>DocumentStatus</c> enumeration value.
+    /// </param>
+    /// <param name="_formletterType">
+    /// A <c>FormletterType</c> enumeration value.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterService</c> class.
+    /// </returns>
+    public static FormletterService newFormletterService(container      _packedFormletter,
+                                                                DocumentStatus _documentStatus,
+                                                                FormletterType _formletterType)
+    {
+        FormletterService formletterService = FormletterService::construct();
+
+        formletterService.parmPackedFormletter(_packedFormletter);
+        formletterService.parmDocumentStatus(_documentStatus);
+        formletterService.parmFormletterType(_formletterType);
+        return formletterService;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>newFromContract</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Initializes a new instance of the <c>FormletterService</c> class.
+    /// </summary>
+    /// <param name="_packedFormletterDataContract">
+    /// A container that contains a packed instance of the <c>FormletterDataContract</c> class.
+    /// </param>
+    /// <param name="_formletterType">
+    /// A value from the <c>FormletterType</c> enumeration.
+    /// </param>
+    /// <returns>
+    /// An instance of the <c>FormletterService</c> class.
+    /// </returns>
+    public static FormletterService newFromContract(container      _packedFormletterDataContract,
+                                                           FormletterType _formletterType)
+    {
+        FormletterService formletterService = FormletterService::construct();
+        formletterService.setContract(FormLetterServiceController::unpackDataContractObject(_packedFormletterDataContract, _formletterType));
+        formletterService.parmFormletterType(_formletterType);
+        return formletterService;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postRemoveProformaNotJourEventHandler_BR</Name>
+				<Source><![CDATA[
+    [PostHandlerFor(classStr(FormletterService), methodStr(FormletterService, removeProformaNotJournal))]
+    /// <summary>
+    /// Calls the <c>FormletterService.postRemoveProformaNotJournal_BR</c> method if Brazilian context is enabled.
+    /// </summary>
+    /// <param name="_args">
+    /// The arguments passed by the event handler.
+    /// </param>
+    public static void postRemoveProformaNotJourEventHandler_BR(XppPrePostArgs _args)
+    {
+        FormletterService formletterService = _args.getThis();
+
+        if (!BrazilParameters::isEnabled())
+            return;
+
+        formletterService.postRemoveProformaNotJournal_BR(
+            _args.getArg('_proformaJournal'));
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getBatchJobId</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Gets the current batch job identifier.
+    /// </summary>
+    /// <returns>
+    /// The current batch job identifier.
+    /// </returns>
+    /// <remarks>
+    /// This will return zero if the process is not in a batch.
+    /// </remarks>
+    protected RefRecId getBatchJobId()
+    {
+        if (this.runningAsService())
+        {
+            return formLetterContract.parmBatchJobId();
+        }
+        else
+        {
+            return formLetter.parmBatchJobId();
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>getTotals</Name>
+				<Source><![CDATA[
+    private Object getTotals()
+    {
+        Object localTotals;
+
+        switch (formletterParmTable.TableId)
+        {
+            case tableNum(VendInvoiceInfoTable):
+                localTotals = FormletterParmTable::getTotals(formletterParmTable, formletterContract.parmParmUpdate());
+                break;
+            case tableNum(PurchParmTable):
+                PurchTable purchTable = PurchTable::find(formletterParmTable.OrderId);
+                localTotals = PurchTotals::newPurchTableConfirmation(purchTable, formletterParmTable as PurchParmTable);
+                break;
+            default:
+        }
+
+        if (localTotals)
+        {
+            localTotals.calc(true);
+        }
+
+        return localTotals;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>postTaxDocument</Name>
+				<Source><![CDATA[
+    private void postTaxDocument()
+    {
+        if (formLetterJournalPostGTE && TaxSolutionScopeIntegrationUtil::isCompanyEnabled())
+        {
+            formLetterJournalPostGTE.postTaxDocument();
+        }
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BaseTest</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using System.Diagnostics;
+
+class BaseTest
+{        
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Runs the class with the specified arguments.
+    /// </summary>
+    /// <param name = "_args">The specified arguments.</param>
+    public static void main(Args _args)
+    {        
+        int loops = 100000;
+        guid g;
+        str theGuid;
+        str GenericTTSId;
+        str someAllocation;
+
+        info(strFmt("%1",Global::tableId2Name(9669)));
+        //info(strFmt("%1",Global::className2Id("BusinessEventsPOReceipt")));//79618
+
+        /*Stopwatch s = new Stopwatch();
+        s.Start();
+        for(int i = 1;i <= 100000;i++)
+        {
+            theGuid = guid2Str(newGuid());
+        }
+        s.Stop();
+        infolog.add(exception::Info,strFmt("Create %1 guids took: %2",loops,s.ElapsedMilliseconds));
+        s.Reset();
+
+        s.Start();
+        for(int i = 1;i <= 100000;i++)
+        {
+            GenericTTSId = getcurrentsessionid()+"@@"+getcurrentmachinename()+"@@"+int2Str(loops);
+        }
+        s.Stop();
+        infolog.add(exception::Info,strFmt("Create %1 generic ttsids took: %2",loops,s.ElapsedMilliseconds));
+        s.Reset();
+        
+        s.Start();
+        for(int i = 1;i <= 100000;i++)
+        {
+            SysGlobalCache sgc = classFactory.globalCache();
+            sgc.set(getcurrentsessionid(),GenericTTSId,"MyBusinessEvent");
+        }
+        s.Stop();
+        infolog.add(exception::Info,strFmt("Write %1 records to GOC: %2",loops,s.ElapsedMilliseconds));
+        s.Reset();
+
+        s.Start();
+        for(int i = 1;i <= 100000;i++)
+        {
+            SysGlobalCache sgc = classFactory.globalCache();
+            someAllocation = sgc.get(getcurrentsessionid(),GenericTTSId);
+        }
+        s.Stop();
+        infolog.add(exception::Info,strFmt("Read %1 records from GOC: %2",loops,s.ElapsedMilliseconds));
+        s.Reset();     */   
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

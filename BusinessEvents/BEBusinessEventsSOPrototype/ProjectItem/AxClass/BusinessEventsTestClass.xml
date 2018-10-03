@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsTestClass</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+class BusinessEventsTestClass
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>main</Name>
+				<Source><![CDATA[
+    // This is a test class to exercise through a business event without creating a PO. The extension method would look similar.
+    public static void main(Args _args)
+    {
+        // This comment marks the place of the next call. Depending on when you want to raise your business event you need to code before or after this comment.
+        // This test exercises through a business event after a purchase order confirmation.
+        BusinessCodeEventsDefinition bed;        
+        BusinessEventsPOConfirmation be = new BusinessEventsPOConfirmation();        
+
+        // Select BusinessEvent
+        select firstonly bed where bed.BusinessEventClassName == "BusinessEventsPOConfirmation";
+
+        // Check if business event is enabled
+        if(bed && bed.Enabled == NoYes::Yes)
+        {
+            // Prepare business events data contract
+
+            // Add additional data
+
+            // Send business event
+
+
+        }        
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

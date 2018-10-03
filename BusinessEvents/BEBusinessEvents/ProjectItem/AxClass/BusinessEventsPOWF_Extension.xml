@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsPOWF_Extension</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+[ExtensionOf(ClassStr(PurchTableTemplateEventHandler))]
+final class BusinessEventsPOWF_Extension
+{
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>canceled</Name>
+				<Source><![CDATA[
+    public void canceled(WorkflowEventArgs  _workflowEventArgs)
+    {
+        next canceled(_workflowEventArgs);        
+        BusinessEventsWFPOConfirmation::construct(_workflowEventArgs).run();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>completed</Name>
+				<Source><![CDATA[
+    public void completed(WorkflowEventArgs _workflowEventArgs)
+    {        
+        next completed(_workflowEventArgs);        
+        BusinessEventsWFPOConfirmation::construct(_workflowEventArgs).run();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

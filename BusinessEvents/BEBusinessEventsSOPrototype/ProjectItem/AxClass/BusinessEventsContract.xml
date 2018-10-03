@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>BusinessEventsContract</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+class BusinessEventsContract
+{
+    // Data you want to transfer from your extension to your business event.
+   
+}
+]]></Declaration>
+		<Methods />
+	</SourceCode>
+</AxClass>

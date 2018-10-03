@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>JsonViewSerializer</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Newtonsoft.Json.Linq;
+using MetaModel=Microsoft.Dynamics.AX.Metadata.MetaModel;
+class JsonViewSerializer extends JsonSerializer
+{
+    // Deserializers will know how to deserialize a particular version. When
+    // information is added to the serialized format, the version number
+    // should be increased.
+    private const int version = 1;
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>SerializeViewField</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Generate a JObject that represents a field defined by its dictField.
+    /// </summary>
+    /// <param name="_table">
+    /// The table instance containing the field value.
+    /// </param>
+    /// <param name="_field">The metadata describing the field.</param>
+    /// <returns>The JObject containing pertinent field information.</returns>
+    private JObject SerializeViewField(Common _view, DictField _field)
+    {
+        JObject jsonField = new JObject();
+        str fieldName = _field.name();
+        var fieldId = fieldName2Id(_view.TableId, fieldName);
+           
+        jsonField.set_Item('Name', fieldName);
+        jsonField.set_Item('Id', fieldId);
+
+        anytype fieldValue = _view.(fieldId);
+
+        switch (this.basetype(_field))
+        {
+            case Types::Container:
+                {
+                    container v = fieldValue;
+                    jsonField.set_Item('Type', 'container');
+                    jsonField.set_Item('Value', this.containerToJson(v));
+                }
+                break;
+
+            case Types::Date:
+                {
+                    jsonField.set_Item('Type', 'date');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(fieldValue, Types::Date)));
+                }
+                break;
+
+            case Types::Enum:
+                {
+                    var enum = enumId2Name(_field.enumId());
+                    if (enum == 'boolean')
+                    {
+                        jsonField.set_Item('Type', 'boolean');
+                        System.Boolean b = fieldValue != 0;
+                        jsonField.set_Item('Value', new JValue(b));
+                    }
+                    else
+                    {
+                        jsonField.set_Item('Type', 'enum');
+                        jsonField.set_Item('Enum', enum);
+                        jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(fieldValue, Types::Enum)));
+                    }
+                }
+                break;
+
+            case Types::Guid:
+                {
+                    guid v = any2Guid(fieldValue);
+                    jsonField.set_Item('Type', 'guid');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Guid)));
+                }
+                break;
+
+            case Types::Int64:
+                {
+                    int64 v = any2Int64(fieldValue);
+                    jsonField.set_Item('Type', 'int64');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Int64)));
+                }
+                break;
+
+            case Types::Integer:
+                {
+                    int v = any2Int(fieldValue);
+                    jsonField.set_Item('Type', 'int');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Integer)));
+                }
+                break;
+
+            case Types::Real:
+                {
+                    real v = any2Real(fieldValue);
+                    jsonField.set_Item('Type', 'decimal');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Real)));
+                }
+                break;
+
+            case Types::String:
+                {
+                    str v = any2Str(fieldValue);
+                    jsonField.set_Item('Type', 'string');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::String)));
+                }
+                break;
+            case Types::Time:
+                {
+                    // There is no kernel function to produce a value of type Time.
+                    TimeOfDay v = fieldValue;
+                    jsonField.set_Item('Type', 'time');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::Time)));
+                }
+                break;
+            case Types::UtcDateTime:
+                {
+                    utcdatetime v = FieldValue;
+                    jsonField.set_Item('Type', 'utcdatetime');
+                    jsonField.set_Item('Value', new JValue(this.atomicValueToNetObject(v, Types::UtcDateTime)));
+                }
+                ;
+                break;
+        }
+
+        return jsonField;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>serializeViewFields</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the fields on the given view
+    /// </summary>
+    /// <param name = "_table">The table instance that contains the fields to serialize.</param>
+    /// <param name = "_tableMetadata">The metadata describing the table containing the fields.</param>
+    /// <param name = "_jsonFields">The array to which the fields are added</param>
+    /// <returns>This method returns the jsonFields parameter. to support fluent APIs.</returns>
+    private JArray serializeViewFields(Common _view, DictView metadata, JArray _jsonFields)
+    {
+        int fieldCount = metadata.fieldCnt();
+
+        // Iterate over the fields.
+        int counter = metadata.fieldNext(0);
+
+        while (counter)
+        {
+            DictField field = metadata.fieldObject(counter);
+
+            JObject jsonField = this.serializeViewField(_view, field);
+            _jsonFields.Add(jsonField);
+
+            counter = metadata.fieldNext(counter);
+        }
+
+        return _jsonFields;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>jsonSerializeView</Name>
+				<Source><![CDATA[
+    /// <summary>
+    /// Serialize the given view.
+    /// </summary>
+    /// <param name="_view">The view to serialize</param>
+    /// <returns>The json document for the designated view.</returns>
+    private JObject jsonSerializeView(Common _view)
+    {
+        JObject jsonRoot = new JObject();
+        JObject jsonTable = new JObject();
+
+        TableName name = tableId2Name(_view.TableId);
+        // MetaModel.AxView metadata = Microsoft.Dynamics.Ax.Xpp.MetadataSupport::GetView(name);
+        DictView metadata = new DictView(_view.TableId);
+        jsonTable.set_Item('Version', JsonViewSerializer::version);
+        jsonTable.set_Item('Name', name);
+        jsonTable.set_Item('Id', _view.TableID);
+
+        JArray jsonFields = new JArray();
+        JArray fields = this.SerializeViewFields(_view, metadata, jsonFields);
+        jsonTable.Add('Fields', fields);
+
+        jsonRoot.set_Item('View', jsonTable);
+
+        return jsonRoot;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>Serialize</Name>
+				<Source><![CDATA[
+    str Serialize(Common _view)
+    {
+        JObject document = this.jsonSerializeView(_view);
+        return document.ToString();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>

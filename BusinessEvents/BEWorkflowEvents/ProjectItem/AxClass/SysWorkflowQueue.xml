@@ -1,0 +1,2147 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AxClass xmlns:i="http://www.w3.org/2001/XMLSchema-instance">
+	<Name>SysWorkflowQueue</Name>
+	<SourceCode>
+		<Declaration><![CDATA[
+using Microsoft.Dynamics.ApplicationPlatform.Workflow.Instrumentation;
+
+// This is a framework class. Customizing this class may cause problems with future upgrades to the software.
+[Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+public class SysWorkflowQueue
+{
+    #Properties
+    SysWorkflowMessageTable messageTable;
+    boolean executeQuery;
+    boolean moveNext;
+    WorkflowMessageBatchAffinity batchAffinity;
+    const str AutomatedTaskExecutionAction = 'Execution';
+
+}
+]]></Declaration>
+		<Methods>
+			<Method>
+				<Name>current</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage current()
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage message;
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        if (messageTable)
+        {
+            // BP deviation documented
+            message = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage();
+            SysWorkflowQueue::copyToMessage(message, messageTable);
+        }
+        else
+        {
+            message = null;
+        }
+
+        CodeAccessPermission::revertAssert();
+
+        return message;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>moveNext</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public boolean moveNext()
+    {
+        if (appl.ttsLevel() != 0)
+        {
+            throw error(strFmt("@SYS124621", classStr(SysWorkflowQueue), methodStr(SysWorkflowQueue, moveNext)));
+        }
+
+        if (executeQuery)
+        {
+            // now get the records updated by this batch note with the read past we
+            // could leave some records
+            select firstfast * from messageTable
+                order by
+                    MessageLifeCycleState, RecId
+                where
+                    messageTable.MessageLifeCycleState == WorkflowMessageLifeCycleState::Queued &&
+                    messageTable.BatchAffinity == batchAffinity;
+
+            executeQuery = false;
+        }
+        else if (moveNext)
+        {
+            // Guard against next exception
+            next messageTable;
+        }
+
+        if (!messageTable)
+        {
+            moveNext = false;
+        }
+
+        return moveNext;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>new</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public void new(
+        WorkflowMessageBatchAffinity _affinity )
+    {
+        executeQuery = true;
+        moveNext = true;
+        batchAffinity = _affinity;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>activate</Name>
+				<Source><![CDATA[
+    private server static void activate(
+            Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message,
+            WorkflowInstanceNumber _instanceNumber,
+            WorkflowUser _originator,
+            WorkflowSubmitOnBehalfUser _submitter)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        System.Guid affinity;
+        CompanyId companyId;
+        CLRObject tempClrObject;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, activate));
+
+        if (appl.ttsLevel() != 0)
+        {
+            throw error("@SYS109598");
+        }
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        tempClrObject = _message.get_ActivityContext();
+        activityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext;
+
+        activityContext.set_DomainUser(AxaptaUserManager::getWorkflowExecutionDomainAccount());
+        workflowContext = activityContext.get_WorkflowContext();
+        // BP deviation documented
+        if (strLen(CLRInterop::getAnyTypeForObject(workflowContext.get_CompanyId())) > 0 )
+        {
+            companyId = workflowContext.get_CompanyId();
+        }
+        else
+        {
+            companyId = curext();
+        }
+
+        affinity = System.Guid::NewGuid();
+        if (SysWorkflow::lock(workflowContext.get_WorkflowCorrelationId(), affinity))
+        {
+            Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowInstanceManager::Activate(
+                _message,
+                _instanceNumber,
+                _originator,
+                _submitter,
+                affinity);
+        }
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>castToTaskActivityContext</Name>
+				<Source><![CDATA[
+    private server static Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext castToTaskActivityContext(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext _activityContext)
+    {
+        guid id = newGuid();
+        System.Type type;
+
+        if (!CLRInterop::isNull(_activityContext) )
+        {
+            type = _activityContext.GetType();
+            // BP deviation documented
+            if (CLRInterop::getAnyTypeForObject(type.get_Name()) == 'TaskActivityContext')
+            {
+                return _activityContext as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext;
+            }
+
+        }
+
+        return null;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>castToWorkItemActivityContext</Name>
+				<Source><![CDATA[
+    private server static Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext castToWorkItemActivityContext(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext _activityContext)
+    {
+        guid id = newGuid();
+        System.Type type;
+
+        if (!CLRInterop::isNull(_activityContext) )
+        {
+            type = _activityContext.GetType();
+            // BP deviation documented
+            if (CLRInterop::getAnyTypeForObject(type.get_Name()) == 'WorkItemActivityContext')
+            {
+                return _activityContext as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext;
+            }
+        }
+
+        return null;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>clearMessages</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void clearMessages(
+        WorkflowCorrelationId _correlationId,
+        boolean _isRoot = false)
+    {
+        SysWorkflowMessageTable record;
+
+        ttsbegin;
+        if (_isRoot)
+        {
+            delete_from record where record.RootCorrelationId == _correlationId;
+        }
+        else
+        {
+            delete_from record where record.WorkflowCorrelationId == _correlationId;
+        }
+        ttscommit;
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>copyToBuffer</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void copyToBuffer(
+        SysWorkflowMessageTable _messageTable,
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext taskActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        activityContext = _message.get_ActivityContext();
+        workflowContext = activityContext.get_WorkflowContext();
+
+        // set the message id
+        // BP deviation documented
+        _messageTable.MessageId = CLRInterop::getAnyTypeForObject(_message.get_MessageId());
+
+        // set activity context type
+        // BP deviation documented
+        _messageTable.ActivityContextType = CLRInterop::getAnyTypeForObject(activityContext.get_ContextType());
+
+        // set workflow context fields
+        // BP deviation documented
+        _messageTable.WorkflowContextCompanyId = CLRInterop::getAnyTypeForObject(workflowContext.get_CompanyId());
+        // BP deviation documented
+        _messageTable.WorkflowContextTableId = CLRInterop::getAnyTypeForObject(workflowContext.get_TableId());
+        // BP deviation documented
+        _messageTable.WorkflowContextRecId = CLRInterop::getAnyTypeForObject(workflowContext.get_RecordId());
+        // BP deviation documented
+        _messageTable.SubWorkflowId = CLRInterop::getAnyTypeForObject(workflowContext.get_SubWorkflowId());
+        // BP deviation documented
+        _messageTable.RootCorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_RootCorrelationId());
+        // BP deviation documented
+        _messageTable.ParentCorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_ParentCorrelationId());
+        // BP deviation documented
+        _messageTable.WorkflowCorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_WorkflowCorrelationId());
+
+        // set configuration fields
+        // BP deviation documented
+        _messageTable.ConfigurationId = CLRInterop::getAnyTypeForObject(activityContext.get_ConfigurationId());
+
+        // set activity instance key fields
+        // BP deviation documented
+        _messageTable.ActivityInstanceId = CLRInterop::getAnyTypeForObject(activityContext.get_ActivityId());
+        // BP deviation documented
+        _messageTable.Bookmark = CLRInterop::getAnyTypeForObject(activityContext.get_Bookmark());
+        // BP deviation documented
+        _messageTable.MessageLifeCycleState = CLRInterop::getAnyTypeForObject(_message.get_LifecycleState());
+        // BP deviation documented
+        _messageTable.MessageType = CLRInterop::getAnyTypeForObject(_message.get_MessageType());
+        // BP deviation documented
+        _messageTable.BatchAffinity = CLRInterop::getAnyTypeForObject(_message.get_BatchAffinity());
+        // BP deviation documented
+        _messageTable.AxaptaUser = CLRInterop::getAnyTypeForObject(_message.get_User());
+        if (!_messageTable.AxaptaUser)
+        {
+            // we default to the current user - messages comming from the WF runtime do not
+            // set the user
+            _messageTable.AxaptaUser = curUserId();
+        }
+        // BP deviation documented
+        _messageTable.ActionName = CLRInterop::getAnyTypeForObject(_message.get_Outcome());
+        // BP deviation documented
+        _messageTable.AssignedUser =  CLRInterop::getAnyTypeForObject(_message.get_AssignedUser());
+
+        if (_messageTable.MessageType == WorkflowMessageType::TaskStarted ||
+            _messageTable.MessageType == WorkflowMessageType::AcknowledgeTaskStarted ||
+            _messageTable.MessageType == WorkflowMessageType::TaskCompleted ||
+            _messageTable.MessageType == WorkflowMessageType::AcknowledgeTaskCompleted ||
+            _messageTable.MessageType == WorkflowMessageType::TaskMaxRuntimeExceeded)
+        {
+            taskActivityContext = SysWorkflowQueue::castToTaskActivityContext(activityContext);
+            if (!CLRInterop::isNull(taskActivityContext))
+            {
+                // store the max runtime id so that the max runtime timer is added by the elementStarted method
+                // BP deviation documented
+                _messageTable.WorkItemInstanceId = CLRInterop::getAnyTypeForObject(taskActivityContext.get_MaxRuntimeId());
+            }
+        }
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>copyToMessage</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public static void copyToMessage(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message,
+        SysWorkflowMessageTable _messageTable)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Model.ActionType outcomeType;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageLifecycleState lifecycleState;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext workflowActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext taskActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.StepActivityContext stepActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext workItemActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.LineItemActivityContext lineItemActivityContext;
+        WorkflowElementTable elementTable;
+        WorkflowStepTable stepTable;
+        WorkflowWorkItemTable workItemTable;
+        WorkflowSubWorkflow lineItemTable;
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        // BP deviation documented
+        workflowContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext(
+            _messageTable.WorkflowContextCompanyId,
+            _messageTable.WorkflowContextTableId,
+            _messageTable.WorkflowContextRecId,
+            _messageTable.RootCorrelationId,
+            _messageTable.ParentCorrelationId,
+            _messageTable.WorkflowCorrelationId,
+            _messageTable.SubWorkflowId);
+
+        // BP deviation documented
+        workflowActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext(
+            _messageTable.WorkflowCorrelationId,
+            _messageTable.ConfigurationId,
+            workflowContext);
+
+        switch (_messageTable.ActivityContextType)
+        {
+            case WorkflowActivityContextType::WorkItemActivity:
+                workItemTable = WorkflowWorkItemTable::findActivityInstanceId(_messageTable.ActivityInstanceId);
+                if (!workItemTable)
+                {
+                    throw error("@SYS111591");
+                }
+                // BP deviation documented
+                taskActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext(
+                    workItemTable.ElementId,
+                    workflowActivityContext);
+
+                // BP deviation documented
+                stepActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.StepActivityContext(
+                    workItemTable.StepId,
+                    taskActivityContext);
+
+                // BP deviation documented
+                workItemActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext(
+                    workItemTable.ActivityId,
+                    stepActivityContext,
+            // BP deviation documented
+            new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowUserContext(_messageTable.AxaptaUser));
+
+                outcomeType = SysWorkflowConvert::toOutcomeType(workItemTable.ElementId, _messageTable.ActionName);
+                workItemActivityContext.set_OutcomeType(outcomeType);
+
+                activityContext = workItemActivityContext;
+                break;
+            case WorkflowActivityContextType::StepActivity:
+                stepTable = WorkflowStepTable::find(_messageTable.ActivityInstanceId);
+                if (!stepTable)
+                {
+                    throw error("@SYS106826");
+                }
+                // BP deviation documented
+                taskActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext(
+                    stepTable.ElementId,
+                    workflowActivityContext);
+
+                // BP deviation documented
+                activityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.StepActivityContext(
+                    stepTable.StepId,
+                    taskActivityContext);
+                break;
+            case WorkflowActivityContextType::TaskActivity:
+                elementTable = WorkflowElementTable::find(_messageTable.ActivityInstanceId);
+                if (!elementTable)
+                {
+                    throw error("@SYS106828");
+                }
+                // BP deviation documented
+                taskActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext(
+                    elementTable.ElementId,
+                    workflowActivityContext);
+
+                if (_messageTable.MessageType == WorkflowMessageType::TaskStarted ||
+                    _messageTable.MessageType == WorkflowMessageType::AcknowledgeTaskStarted ||
+                    _messageTable.MessageType == WorkflowMessageType::TaskCompleted ||
+                    _messageTable.MessageType == WorkflowMessageType::AcknowledgeTaskCompleted ||
+                    _messageTable.MessageType == WorkflowMessageType::TaskMaxRuntimeExceeded)
+                {
+                    taskActivityContext.set_MaxRuntimeId(_messageTable.WorkItemInstanceId);
+                    if (_messageTable.WorkItemInstanceId != emptyGuid())
+                    {
+                        _message.set_IsMaxRuntime(true);
+                    }
+                }
+                activityContext = taskActivityContext;
+                break;
+            case WorkflowActivityContextType::LineItemActivity:
+                lineItemTable = WorkflowSubWorkflow::find(_messageTable.ActivityInstanceId);
+                if (!lineItemTable)
+                {
+                    throw error("@SYS340315");
+                }
+
+                // BP deviation documented
+                lineItemActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.LineItemActivityContext(
+                    lineItemTable.ElementId,
+                    workflowActivityContext,
+                    lineItemTable.WaitForComplete == NoYes::Yes ? true : false);
+                activityContext = lineItemActivityContext;
+                break;
+            case WorkflowActivityContextType::WorkflowActivity:
+                activityContext = workflowActivityContext;
+                break;
+            default:
+                throw error("@SYS340317");
+        }
+
+        activityContext.set_Bookmark(_messageTable.Bookmark);
+        // BP deviation documented
+        _message.set_ActivityContext(activityContext);
+        _message.set_MessageId(_messageTable.MessageId);
+        messageType = SysWorkflowConvert::toMessageType(_messageTable.MessageType);
+        _message.set_MessageType(messageType);
+        lifecycleState = SysWorkflowConvert::toLifecycleState(_messageTable.MessageLifeCycleState);
+        _message.set_LifecycleState(lifecycleState);
+        _message.set_BatchAffinity(_messageTable.BatchAffinity);
+        _message.set_User(_messageTable.AxaptaUser);
+        _message.set_AssignedUser(_messageTable.AssignedUser);
+        _message.set_Outcome(_messageTable.ActionName);
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>dequeue</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void dequeue(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        const int maxRetryAttempts = 5;
+        int retryNum = 0;
+        SysWorkflowMessageTable record;
+
+        if (_message == null)
+        {
+            throw error(strFmt("@SYS104836", staticMethodStr(SysWorkflowQueue, dequeue), varStr(_message)));
+        }
+
+        try
+        {
+            ttsbegin;
+            delete_from record where record.MessageId == _message.MessageId;
+            ttscommit;
+        }
+        catch (Exception::Deadlock)
+        {
+            if (retryNum < maxRetryAttempts)
+            {
+                retryNum++;
+                retry;
+            }
+
+            throw Exception::Deadlock;
+        }
+        catch (Exception::UpdateConflict)
+        {
+            if (retryNum < maxRetryAttempts)
+            {
+                retryNum++;
+                retry;
+            }
+
+            throw Exception::UpdateConflictNotRecovered;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>dispatch</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static boolean dispatch(
+        WorkflowMessageBatchAffinity _affinity)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage message;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        SysWorkflowQueue messageQueue;
+        WorkflowCorrelationId correlationId;
+        WorkflowMessageType messageType;
+        SysWorkflowTable workflowTable;
+        SysWorkflowFaultTable faultTable;
+        SysWorkflowMessageTable messageTable;
+        Set faultedWorkflows = new Set(Types::Guid);
+        Set lockedWorkFlows = new Set(Types::Guid);
+        Set messageRecordsToReset = new Set(Types::Guid);
+        InfologText messageText;
+        int line = infologLine();
+        #OCCRetryCount
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        if (appl.ttsLevel() != 0)
+        {
+            throw error(strFmt("@SYS124621", classStr(SysWorkflowQueue), staticMethodStr(SysWorkflowQueue, dispatch)));
+        }
+
+        messageQueue = new SysWorkflowQueue(_affinity);
+        while (messageQueue.moveNext())
+        {
+            System.IDisposable processEvent = null;
+            try
+            {
+                // BP deviation documented
+                message = messageQueue.current();
+                messageType = enum2int(message.get_MessageType());
+                activityContext = message.get_ActivityContext();
+                workflowContext = activityContext.get_WorkflowContext();
+                correlationId = workflowContext.get_WorkflowCorrelationId();
+                processEvent = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowProcessMessage(
+                    message.MessageId,
+                    correlationId,
+                    workflowContext.ParentCorrelationId,
+                    workflowContext.RootCorrelationId,
+                    enum2Symbol(enumNum(WorkflowMessageType), messageType));
+
+                ttsbegin;
+                workflowTable = SysWorkflowTable::find(correlationId, true);
+                if (!workflowTable)
+                {
+                    // The message may have been deleted due to a cancel, continue if this is the case
+                    SysWorkflowMessageTable orphanedMessage = SysWorkflowMessageTable::findByMessageId(CLRInterop::getAnyTypeForObject(message.get_MessageId()));
+                    if (orphanedMessage == null || orphanedMessage.RecId == 0)
+                    {
+                        ttsAbort;
+                        continue;
+                    }
+                    else
+                    {
+                        ttsAbort;
+                        WorkflowTrace::Log(
+                            strFmt("Dequeueing orphaned message of type: %1, Id: %2, WorkflowCorrelationId: %3",
+                                   messageType,
+                                   orphanedMessage.MessageId,
+                                   correlationId),
+                            TraceLevel::Info,
+                            TraceOrigin::WFRuntime );
+
+                        SysWorkflowQueue::dequeue(message);
+                        continue;
+                    }
+                }
+
+                faultTable = SysWorkflowFaultTable::find(workflowTable.RootCorrelationId, true);
+                if (faultTable.RecId != 0)
+                {
+                    SysWorkflow::fault(workflowContext, faultTable.User, faultTable.FaultMessage);
+                    faultTable.delete();
+                    faultedWorkflows.add(workflowTable.RootCorrelationId);
+                }
+
+                // if the workflow is faulted then get the next message
+                if (faultedWorkflows.in(workflowTable.RootCorrelationId))
+                {
+                    ttscommit;
+                    continue;
+                }
+
+                if (workflowTable.LockStatus == WorkflowLockStatus::LockedWorkflow)
+                {
+                    // Write a warning indicating that a locked workflow was attempted to be processed
+                    WorkflowRuntimeEventSource::EventWriteLockedWorkflow(message.MessageId, correlationId, workflowContext.ParentCorrelationId, workflowContext.RootCorrelationId, WorkflowTable.LockCount);
+
+                    // if the workflow is locked reset the message affinity
+                    messageRecordsToReset.add(CLRInterop::getAnyTypeForObject(message.get_MessageId()));
+
+                    // recover stranded workflows
+                    if (workflowTable.LockCount >= #RetryNum)
+                    {
+                        workflowTable.Affinity = emptyGuid();
+                        workflowTable.LockCount = 0;
+                        workflowTable.LockStatus = WorkflowLockStatus::UnlockedBySystem;
+                        workflowTable.update();
+                    }
+                    else
+                    {
+                        //Only increment the lock count if this is the first time workFlow record is found locked
+                        if (lockedWorkFlows.in(workflowTable.RootCorrelationId) == false)
+                        {
+                            lockedWorkFlows.add(workflowTable.RootCorrelationId);
+                            
+                            workflowTable.LockCount++;
+                            workflowTable.update();
+                        }
+                    }
+                    ttscommit;
+                    continue;
+                }
+                else
+                {
+                    // If sending an ack back to workflow runtime, lock the workflow now
+                    if (messageType == WorkflowMessageType::AcknowledgeWorkflowCompleted ||
+                        messageType == WorkflowMessageType::AcknowledgeTaskStarted ||
+                        messageType == WorkflowMessageType::AcknowledgeTaskCompleted ||
+                        messageType == WorkflowMessageType::TaskMaxRuntimeExceeded ||
+                        messageType == WorkflowMessageType::AcknowledgeWorkflowStarted ||
+                        messageType == WorkflowMessageType::AcknowledgeWorkItemCompleted ||
+                        messageType == WorkflowMessageType::AcknowledgeAutomaticTaskExecution)
+                    {
+                        workflowTable.LockStatus = WorkflowLockStatus::LockedWorkflow;
+                        // affinity will get assigned when the workflow runtime loads the instance
+                        workflowTable.LockCount = 0;
+                        workflowTable.update();
+                    }
+                }
+                ttscommit;
+
+                switch (messageType)
+                {
+                    case WorkflowMessageType::Activation:
+                        SysWorkflowQueue::activate(message, workflowTable.InstanceNumber, workflowTable.Originator, workflowTable.Submitter);
+                        break;
+                    case WorkflowMessageType::AcknowledgeWorkflowCompleted:
+                    case WorkflowMessageType::AcknowledgeTaskStarted:
+                    case WorkflowMessageType::AcknowledgeTaskCompleted:
+                    case WorkflowMessageType::TaskMaxRuntimeExceeded:
+                    case WorkflowMessageType::AcknowledgeWorkflowStarted:
+                    case WorkflowMessageType::AcknowledgeWorkItemCompleted:
+                    case WorkflowMessageType::AcknowledgeAutomaticTaskExecution:
+                        SysWorkflowQueue::resume(message, workflowTable.InstanceId, workflowTable.InstanceNumber, workflowTable.Originator, workflowTable.Submitter);
+                        break;
+                    case WorkflowMessageType::WorkflowStarted:
+                        SysWorkflowQueue::workflowStarted(message);
+                        break;
+                    case WorkflowMessageType::AutomaticTaskExecution:
+                        SysWorkflowQueue::executeAutomaticTask(message);
+                        break;
+                    case WorkflowMessageType::TaskStarted:
+                        SysWorkflowQueue::elementStarted(message);
+                        break;
+                    case WorkflowMessageType::WorkflowCompleted:
+                        SysWorkflowQueue::workflowCompleted(message);
+                        break;
+                    case WorkflowMessageType::TaskCompleted:
+                        SysWorkflowQueue::elementCompleted(message);
+                        break;
+                    case WorkflowMessageType::WorkflowRecalled:
+                        try
+                        {
+                            SysWorkflowQueue::workflowRecalled(message);
+                        }
+                        catch
+                        {
+                            SysWorkflow::unrecoverable(
+                                activityContext,
+                                curUserId(),
+                                SysWorkflowHelper::getInfoLogMessage(line));
+                        }
+                        break;
+                    case WorkflowMessageType::WorkflowCancelled:
+                        try
+                        {
+                            SysWorkflowQueue::workflowCanceled(message);
+                        }
+                        catch
+                        {
+                            SysWorkflow::unrecoverable(
+                                activityContext,
+                                curUserId(),
+                                SysWorkflowHelper::getInfoLogMessage(line));
+                        }
+                        break;
+                    default:
+                        throw error(strFmt("@SYS106834", enum2str(messageType)));
+
+                }
+            }
+            catch
+            {
+                messageText = SysWorkflowHelper::getInfoLogMessage(line);
+                SysWorkflow::fault(
+                        workflowContext,
+                        curUserId(),
+                        messageText);
+                infolog.clear(infologLine() -1);
+            }
+            finally
+            {
+                if (processEvent != null)
+                {
+                    processEvent.Dispose();
+                    processEvent = null;
+                }
+            }
+        }
+        CodeAccessPermission::revertAssert();
+
+        // Reset the message affinity for locked workFlows
+        ttsbegin;
+        SetEnumerator se = messageRecordsToReset.getEnumerator();
+        while (se.MoveNext())
+        {
+            update_recordset messageTable
+                setting BatchAffinity = emptyGuid()
+                where messageTable.MessageId == se.current();
+        }
+        ttscommit;
+             
+        if (messageRecordsToReset.empty())
+        {
+            return false;
+        }
+        else
+        {
+            return true;
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>elementCompleted</Name>
+				<Source><![CDATA[
+    private server static void elementCompleted(
+                        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage acknowledgementMessage;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        SysWorkflowTable workflowTable;
+        WorkflowNotificationLevel notificationLevel;
+        WorkflowNotificationType notificationType;
+        SysWorkflowElement sysWorkflowElement;
+        WorkflowOutcomeName outcome;
+        WorkflowElementOutcomeType outcomeType;
+        WorkflowElementType elementType;
+        SysWorkflowNotificationContext notificationContext;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, elementCompleted));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        activityContext = _message.get_ActivityContext();
+        Debug::assert(!CLRInterop::isNull(activityContext));
+        workflowContext = activityContext.get_WorkflowContext();
+        Debug::assert(!CLRInterop::isNull(workflowContext));
+
+        // For a canceled line item we are expecting a lineItemActivityContext; cancel is only invoked when the parent
+        // workflow is canceled.  In which case we need to treat the line item element just like any other element in the parent's
+        // element collection.  In the LineItem activity you need to add the elementId to the elements requiring compensation.
+
+        // BP deviation documented
+        acknowledgementMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(activityContext);
+        messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::AcknowledgeTaskCompleted);
+        acknowledgementMessage.set_MessageType(messageType);
+
+        sysWorkflowElement = SysWorkflowElement::newElement(activityContext.get_ActivityId());
+
+        // determine action type
+        // BP deviation documented
+        outcome = CLRInterop::getAnyTypeForObject(_message.get_Outcome());
+        outcomeType = sysWorkflowElement.outcomeType(outcome);
+        switch (outcomeType)
+        {
+            case WorkflowElementOutcomeType::Complete:
+                notificationType = WorkflowNotificationType::Completed;
+                break;
+            case WorkflowElementOutcomeType::Deny:
+                notificationType = WorkflowNotificationType::Denied;
+                break;
+            case WorkflowElementOutcomeType::RequestChange:
+                notificationType = WorkflowNotificationType::ChangeRequested;
+                break;
+            case WorkflowElementOutcomeType::Return:
+                notificationType = WorkflowNotificationType::Return;
+                break;
+            default:
+                throw error (strFmt("@SYS110281", _message.get_Outcome()));
+        }
+
+        //determine element type
+        elementType = sysWorkflowElement.parmElementType();
+        switch (elementType)
+        {
+            case WorkflowElementType::Approval:
+                notificationLevel = WorkflowNotificationLevel::Approval;
+                break;
+            case WorkflowElementType::Task:
+                notificationLevel = WorkflowNotificationLevel::Task;
+                break;
+            case WorkflowElementType::LineItemWorkflow:
+                notificationLevel = WorkflowNotificationLevel::Workflow;
+                break;
+            default:
+                throw error (strFmt("@SYS109591", enum2str(elementType)));
+        }
+
+        ttsbegin;
+        SysWorkflowQueue::raiseElementEvent(
+            workflowContext,
+            sysWorkflowElement,
+            WorkflowTaskEventCategory::Completed,
+            _message.get_Outcome());
+
+        // if the completing message is a max runtime message then we need to make the ack a max runtime
+        if (_message.get_IsMaxRuntime())
+        {
+            acknowledgementMessage.set_IsMaxRuntime(true);
+        }
+
+        WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newElementCompleted(
+            activityContext,
+            sysWorkflowElement,
+            _message.get_User(),
+            outcome,
+            outcomeType));
+
+        SysWorkflowQueue::enqueue(acknowledgementMessage);
+        SysWorkflowQueue::dequeue(_message);
+        ttscommit;
+
+        // send the notifications
+        workflowTable = SysWorkflowTable::find(workflowContext.get_WorkflowCorrelationId());
+        if (workflowTable &&
+            sysWorkflowElement.parmElementType() != WorkflowElementType::LineItemWorkflow &&
+            sysWorkflowElement.parmElementType() != WorkflowElementType::Subworkflow)
+        {
+            notificationContext = new SysWorkflowNotificationContext();
+            notificationContext.parmWorkflowContext(SysWorkflowConvert::toXppWorkflowContext(workflowContext));
+            notificationContext.parmNotificationId(activityContext.get_ActivityId());
+            // element id
+            notificationContext.parmWorkflowInstanceNumber(workflowTable.InstanceNumber);
+            notificationContext.parmOriginator(workflowTable.Originator);
+            notificationContext.parmAction(_message.get_Outcome());
+            notificationContext.parmNotificationLevel(notificationLevel);
+            notificationContext.parmNotificationType(notificationType);
+            notificationContext.parmIsElement(true);
+            SysWorkflowHelper::sendNotifications(notificationContext);
+        }
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>elementDueDateExceeded</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void elementDueDateExceeded(
+        WorkflowCorrelationId _correlationId,
+        WorkflowElementId _elementId,
+        WorkflowActivityInstanceId _maxRuntimeId,
+        WorkflowDueDateTime _dueDateTime)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext taskActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage acknowledgementMessage;
+        WorkflowElementTable elementTable;
+        SysWorkflowTable workflowTable;
+        SysWorkflowElementTable maxRuntimeTable;
+        WorkflowStepTable stepTable;
+        SysWorkflowMessageTable messageTable;
+        int line = infologLine();
+
+        try
+        {
+            setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, elementDueDateExceeded));
+
+            new InteropPermission(InteropKind::ClrInterop).assert();
+
+            workflowTable = SysWorkflowTable::find(_correlationId);
+            if (!workflowTable)
+            {
+                throw error("@SYS116100");
+            }
+
+            elementTable = WorkflowElementTable::find(_elementId);
+            if (!elementTable)
+            {
+                throw error("@SYS106828");
+            }
+
+            // BP deviation documented
+            workflowContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext(
+                workflowTable.ContextCompanyId,
+                workflowTable.ContextTableId,
+                workflowTable.ContextRecId,
+                workflowTable.RootCorrelationId,
+                workflowTable.ParentCorrelationId,
+                workflowTable.WorkflowCorrelationId,
+                workflowTable.SubWorkflowId);
+            // BP deviation documented
+            activityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext(
+                workflowTable.WorkflowCorrelationId,
+                workflowTable.ConfigurationId,
+                workflowContext);
+            // BP deviation documented
+            taskActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext(
+                _elementId,
+                activityContext);
+            // set the bookmark to the max runtime id - triggers max runtime
+            taskActivityContext.set_Bookmark(_maxRuntimeId);
+
+            // BP deviation documented
+            acknowledgementMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(taskActivityContext);
+            messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::TaskMaxRuntimeExceeded);
+            acknowledgementMessage.set_MessageType(messageType);
+
+            ttsbegin;
+            // clean-up the due date record
+            delete_from maxRuntimeTable where
+            // BP deviation documented
+            maxRuntimeTable.CorrelationId == CLRInterop::getAnyTypeForObject(workflowContext.get_WorkflowCorrelationId()) &&
+                maxRuntimeTable.ElementId == _elementId;
+
+            // de-queue any pending messages for the element
+            update_recordset
+                messageTable
+                setting
+                    MessageLifeCycleState = WorkflowMessageLifeCycleState::Dequeued
+                where
+                    messageTable.WorkflowCorrelationId == _correlationId &&
+                    messageTable.ActivityInstanceId == _elementId &&
+                    messageTable.MessageLifeCycleState == WorkflowMessageLifeCycleState::Queued;
+
+            // clean-up the element's work items
+            while select StepId, ElementId from stepTable
+                order by ElementId
+                where
+                    stepTable.ElementId == _elementId
+            {
+                SysWorkflowWorkItem::completeStepWorkItems(
+                    taskActivityContext,
+                    stepTable.StepId,
+                    curUserId());
+            }
+
+            WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newElementDueDateExceeded(
+                taskActivityContext, elementTable, curUserId(), _dueDateTime));
+            SysWorkflowQueue::enqueue(acknowledgementMessage);
+            ttscommit;
+
+            CodeAccessPermission::revertAssert();
+        }
+        //try
+        catch
+        {
+            WorkflowDiscreteEventWrapper::WriteEventWFWorkItemDueDateExceededFailure (_correlationId, SysWorkflowHelper::getInfoLogMessage(line));
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>elementStarted</Name>
+				<Source><![CDATA[
+    private server static void elementStarted(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage acknowledgementMessage;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext taskActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        WorkflowElementTable elementTable;
+        SysWorkflowElement sysWorkflowElement;
+        SysWorkflowElementTable maxRuntimeTable;
+        WorkflowConfigDate configDate;
+        CLRObject tempClrObject;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, elementStarted));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        activityContext = _message.get_ActivityContext();
+        Debug::assert(!CLRInterop::isNull(activityContext));
+        workflowContext = activityContext.get_WorkflowContext();
+        Debug::assert(!CLRInterop::isNull(workflowContext));
+
+        // BP deviation documented
+        acknowledgementMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(activityContext);
+        messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::AcknowledgeTaskStarted);
+        acknowledgementMessage.set_MessageType(messageType);
+
+        sysWorkflowElement = SysWorkflowElement::newElement(activityContext.get_ActivityId());
+
+        ttsbegin;
+        SysWorkflowQueue::raiseElementEvent(
+            workflowContext,
+            sysWorkflowElement,
+            WorkflowTaskEventCategory::Started,
+            '');  // line item started does not have an outcome
+
+        elementTable = sysWorkflowElement.elementTable();
+        if (elementTable && elementTable.workflowMaxRuntimeTable().Enabled == NoYes::Yes)
+        {
+            tempClrObject = _message.get_ActivityContext();
+            taskActivityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext;
+            Debug::assert(!CLRInterop::isNull(taskActivityContext));
+
+            configDate = WorkflowConfigDate::newTimeSpanTable(elementTable.workflowMaxRuntimeTable().workflowTimeSpanTable());
+            // BP deviation documented
+            maxRuntimeTable.CorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_WorkflowCorrelationId());
+            maxRuntimeTable.ElementId = elementTable.ElementId;
+            // BP deviation documented
+            maxRuntimeTable.MaxRuntimeId = CLRInterop::getAnyTypeForObject(taskActivityContext.get_MaxRuntimeId());
+
+            maxRuntimeTable.DueDateTime = SysWorkflowDueDateProvider::resolveElementDueDate(
+                workflowContext,
+                configDate,
+                elementTable);
+
+            // check if the timer alreay exists
+            if (!SysWorkflowElementTable::exist(workflowContext.get_WorkflowCorrelationId(), elementTable.ElementId))
+            {
+                maxRuntimeTable.insert();
+            }
+        }
+
+        WorkflowRuntimeEventSource::EventWriteElementStarted(
+            workflowContext.WorkflowCorrelationId,
+            workflowContext.ParentCorrelationId,
+            workflowContext.RootCorrelationId,
+            activityContext.ConfigurationId,
+            sysWorkflowElement.elementId(),
+            sysWorkflowElement.elementName(),
+            enum2Symbol(enumNum(WorkflowElementType), sysWorkflowElement.parmElementType()));
+
+        WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newElementStarted(
+            activityContext, sysWorkflowElement, _message.get_User()));
+        SysWorkflowQueue::enqueue(acknowledgementMessage);
+        SysWorkflowQueue::dequeue(_message);
+        ttscommit;
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>enqueue</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void enqueue(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+        SysWorkflowMessageTable messageTable;
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        if (CLRInterop::isNull(_message))
+        {
+            throw error(strFmt("@SYS104836", staticMethodStr(SysWorkflowQueue, enqueue), varStr(_message)));
+        }
+
+        if (SysWorkflowMessageTable::exist(_message.get_MessageId()))
+        {
+            throw error("@SYS113591");
+        }
+
+        SysWorkflowQueue::copyToBuffer(messageTable, _message);
+        messageTable.BatchAffinity = emptyGuid();
+        messageTable.MessageLifeCycleState = WorkflowMessageLifeCycleState::Queued;
+        ttsbegin;
+
+        // When a task step completes cleanup its work items
+        if (WorkflowMessageType::TaskCompleted == messageTable.MessageType)
+        {
+            activityContext = _message.get_ActivityContext();
+            SysWorkflowWorkItem::completeElementWorkItems(activityContext, activityContext.get_ActivityId(), curUserId());
+        }
+        messageTable.insert();
+        ttscommit;
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>executeAutomaticTask</Name>
+				<Source><![CDATA[
+    private server static void executeAutomaticTask(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage acknowledgementMessage;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        SysWorkflowElement sysWorkflowElement;
+        CLRObject tempClrObject;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        SysWorkflowTable workflowTable;
+        SysWorkflowNotificationContext notificationContext;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, executeAutomaticTask));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        tempClrObject = _message.get_ActivityContext();
+        activityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext;
+
+        workflowContext = activityContext.get_WorkflowContext();
+
+        // BP deviation documented
+        acknowledgementMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(activityContext);
+        messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::AcknowledgeAutomaticTaskExecution);
+        acknowledgementMessage.set_MessageType(messageType);
+
+        sysWorkflowElement = SysWorkflowElement::newElement(activityContext.get_ActivityId());
+
+        WorkflowRuntimeEventSource::EventWriteElementStarted(
+            workflowContext.WorkflowCorrelationId,
+            workflowContext.ParentCorrelationId,
+            workflowContext.RootCorrelationId,
+            activityContext.ConfigurationId,
+            sysWorkflowElement.elementId(),
+            sysWorkflowElement.elementName(),
+            enum2Symbol(enumNum(WorkflowElementType), sysWorkflowElement.parmElementType()));
+
+        ttsbegin;
+        SysWorkflowQueue::raiseElementEvent(
+            activityContext.get_WorkflowContext(),
+            sysWorkflowElement,
+            WorkflowTaskEventCategory::Execute,
+            ''); // automatic task does not have an outcome
+
+        WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newExecuteAutomaticTask(
+            activityContext,
+            sysWorkflowElement.elementTable(),
+            _message.get_User()));
+        SysWorkflowQueue::enqueue(acknowledgementMessage);
+        SysWorkflowQueue::dequeue(_message);
+        ttscommit;
+
+        // send the notifications
+        workflowTable = SysWorkflowTable::find(workflowContext.get_WorkflowCorrelationId());
+        if (workflowTable &&
+            sysWorkflowElement.parmElementType() == WorkflowElementType::AutomatedTask)
+        {
+            notificationContext = new SysWorkflowNotificationContext();
+            notificationContext.parmWorkflowContext(SysWorkflowConvert::toXppWorkflowContext(workflowContext));
+            notificationContext.parmNotificationId(activityContext.get_ActivityId()); // element id
+            notificationContext.parmWorkflowInstanceNumber(workflowTable.InstanceNumber);
+            notificationContext.parmOriginator(workflowTable.Originator);
+            notificationContext.parmAction(AutomatedTaskExecutionAction);
+            notificationContext.parmNotificationLevel(WorkflowNotificationLevel::Task);
+            notificationContext.parmNotificationType(WorkflowNotificationType::Completed);
+            notificationContext.parmIsElement(true);
+            SysWorkflowHelper::sendNotifications(notificationContext);
+        }
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>internalCancel</Name>
+				<Source><![CDATA[
+    private server static void internalCancel(
+        SysWorkflowTable _workflowTable,
+        List _notifications,
+        WorkflowUser _user)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        SysWorkflowInstanceTable instanceTable;
+        List elements;
+        ListEnumerator elementEnumerator;
+        WorkflowElementId elementId;
+        SysWorkflowNotificationContext notificationContext;
+        List notifications = new List(Types::Class);
+        SysWorkflowElement sysWorkflowElement;
+        #Workflow
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, internalCancel));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        instanceTable = SysWorkflowInstanceTable::find(_workflowTable.WorkflowCorrelationId);
+        if (!instanceTable)
+        {
+            throw error("@SYS114483");
+        }
+
+        // BP deviation documented
+        workflowContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext(
+            _workflowTable.ContextCompanyId,
+            _workflowTable.ContextTableId,
+            _workflowTable.ContextRecId,
+            _workflowTable.RootCorrelationId,
+            _workflowTable.ParentCorrelationId,
+            _workflowTable.WorkflowCorrelationId,
+            _workflowTable.SubWorkflowId);
+
+        // BP deviation documented
+        activityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext(
+            _workflowTable.WorkflowCorrelationId,
+            _workflowTable.ConfigurationId,
+            workflowContext);
+
+        // the elements were added in reverse order of execution
+        if (conPeek(instanceTable.Elements, 1))
+        {
+            elements = List::create(instanceTable.Elements);
+            elementEnumerator = elements.getEnumerator();
+            while (elementEnumerator.moveNext())
+            {
+                elementId = elementEnumerator.current();
+                sysWorkflowElement = SysWorkflowElement::newElement(elementId);
+
+                // for each element raise the element canceled event
+                SysWorkflowQueue::raiseElementEvent(
+                    workflowContext,
+                    sysWorkflowElement,
+                    WorkflowTaskEventCategory::Completed,
+                    #WorkflowActionCancelled);
+
+                WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newElementCanceled(
+                    activityContext,
+                    sysWorkflowElement,
+                    _user));
+            }
+            // end elements
+        }
+
+        // for each workflow raise the workflow canceled event
+        SysWorkflowQueue::raiseWorkflowEvent(
+            workflowContext,
+            _workflowTable.TemplateName,
+            WorkflowEventCategory::Cancelled);
+
+        notificationContext = new SysWorkflowNotificationContext();
+        notificationContext.parmWorkflowContext(SysWorkflowConvert::toXppWorkflowContext(workflowContext));
+        notificationContext.parmNotificationId(_workflowTable.ConfigurationId);
+        notificationContext.parmWorkflowInstanceNumber(_workflowTable.InstanceNumber);
+        notificationContext.parmOriginator(_workflowTable.Originator);
+        notificationContext.parmAction(enum2Symbol(enumNum(WorkflowConfigNotificationActionType), WorkflowConfigNotificationActionType::Terminated));
+        notificationContext.parmNotificationLevel(WorkflowNotificationLevel::Workflow);
+        notificationContext.parmNotificationType(WorkflowNotificationType::Canceled);
+        _notifications.addEnd(notificationContext);
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>invokeElementEventHandler</Name>
+				<Source><![CDATA[
+    private server static void invokeElementEventHandler(
+        WorkflowContext _workflowContext,
+        SysWorkflowElement _sysWorkflowElement,
+        WorkflowTaskEventCategory _eventCategory,
+        WorkflowOutcomeName _outcome,
+        className _className,
+        boolean _isCanceled)
+    {
+        WorkflowElementEventArgs eventArgs;
+        WorkflowElementStartedEventHandler elementStartedEventHandler;
+        WorkflowElementCompletedEventHandler elementCompletedEventHandler;
+        WorkflowElementDeniedEventHandler elementDeniedEventHandler;
+        WorkflowElemChangeRequestedEventHandler elementChangeRequestedEventHandler;
+        WorkflowElementReturnedEventHandler elementReturnedEventHandler;
+        WorkflowElementCanceledEventHandler elementCancelledEventHandler;
+        WorkflowElementExecutionEventHandler elementExecutionEventHandler;
+        int line = infologLine();
+        #Workflow
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, invokeElementEventHandler));
+
+        eventArgs = WorkflowElementEventArgs::newWorkflowElementEventArgs(_workflowContext);
+
+        // If no event handler is defined, move on successfully
+        if (strLen(_className) > 0)
+        {
+            if (_isCanceled)
+            {
+                elementCancelledEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementCanceledEventHandler)) as WorkflowElementCanceledEventHandler;
+                using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowCanceledEventHandler)))
+                {
+                    elementCancelledEventHandler.canceled(eventArgs);
+                }
+                SysWorkflowElementTable::delete(_workflowContext.parmWorkflowCorrelationId(), _sysWorkflowElement.elementId());
+            }
+            else if (WorkflowTaskEventCategory::Started == _eventCategory)
+            {
+                elementStartedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementStartedEventHandler)) as WorkflowElementStartedEventHandler;
+                using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElementStartedEventHandler)))
+                {
+                    elementStartedEventHandler.started(eventArgs);
+                }
+            }
+            else if (WorkflowTaskEventCategory::Execute == _eventCategory)
+            {
+                elementExecutionEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementExecutionEventHandler)) as WorkflowElementExecutionEventHandler;
+                using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteAutomatedTask(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElementExecutionEventHandler)))
+                {
+                    elementExecutionEventHandler.execute(eventArgs);
+                }
+            }
+            else
+            {
+                // call correct event handler based on outcome type
+                switch (_sysWorkflowElement.outcomeType(_outcome))
+                {
+                    case WorkflowElementOutcomeType::Complete:
+                        elementCompletedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementCompletedEventHandler)) as WorkflowElementCompletedEventHandler;
+                        using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElementCompletedEventHandler)))
+                        {
+                            elementCompletedEventHandler.completed(eventArgs);
+                        }
+                        SysWorkflowElementTable::delete(_workflowContext.parmWorkflowCorrelationId(), _sysWorkflowElement.elementId());
+                        break;
+                    case WorkflowElementOutcomeType::Deny:
+                        elementDeniedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementDeniedEventHandler)) as WorkflowElementDeniedEventHandler;
+                        using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElementDeniedEventHandler)))
+                        {
+                            elementDeniedEventHandler.denied(eventArgs);
+                        }
+                        SysWorkflowElementTable::delete(_workflowContext.parmWorkflowCorrelationId(), _sysWorkflowElement.elementId());
+                        break;
+                    case WorkflowElementOutcomeType::RequestChange:
+                        elementChangeRequestedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElemChangeRequestedEventHandler)) as WorkflowElemChangeRequestedEventHandler;
+                        using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElemChangeRequestedEventHandler)))
+                        {
+                            elementChangeRequestedEventHandler.changeRequested(eventArgs);
+                        }
+                        break;
+                    case WorkflowElementOutcomeType::Return:
+                        elementReturnedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowElementReturnedEventHandler)) as WorkflowElementReturnedEventHandler;
+                        using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), _sysWorkflowElement.elementId(), _className, classStr(WorkflowElementReturnedEventHandler)))
+                        {
+                            elementReturnedEventHandler.returned(eventArgs);
+                        }
+                        break;
+                    default:
+                        throw error (strFmt("@SYS110281", _outcome));
+                }
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>invokeStateTransition</Name>
+				<Source><![CDATA[
+    private server static void invokeStateTransition(
+        Common _document,
+        SysElementName _stateMachineName,
+        SysElementName _stateMachineTargetStateName)
+    {
+        StateMachine stateMachine;
+        SysDictClass sysDictClass;
+        SysDictTable sysDictTable;
+        int targetState;
+        
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, invokeStateTransition));
+
+        if (!_document)
+        {
+            throw error(strFmt("@SYS104836", staticMethodStr(SysWorkflowQueue, invokeStateTransition), varStr(_document)));
+        }
+
+        if (!_stateMachineName)
+        {
+            throw error(strFmt("@SYS104836", staticMethodStr(SysWorkflowQueue, invokeStateTransition), varStr(_stateMachineName)));
+        }
+
+        if (!_stateMachineTargetStateName)
+        {
+            throw error(strFmt("@SYS104836", staticMethodStr(SysWorkflowQueue, invokeStateTransition), varStr(_stateMachineTargetStateName)));
+        }
+
+        sysDictTable = new SysDictTable(_document.TableId);
+        if (null == sysDictTable)
+        {
+            throw error("@SYS118083");
+        }
+                
+        if (!SysDictTable::hasMethod(sysDictTable, _stateMachineName))
+        {
+            throw error(strfmt('@SYS:StateMachineTableMethod', sysDictTable.name(), _stateMachineName));
+        }
+          
+        stateMachine = sysDictTable.callObject(_stateMachineName, _document);
+        Debug::assert(null != stateMachine);
+            
+        sysDictClass = new SysDictClass(classnum(stateMachine));
+        if (null == sysDictClass)
+        {
+            throw error(strfmt('@SYS:StateMachineStronglyTypedClass', sysDictTable.name(), _stateMachineName));
+        }
+
+        Debug::assert(sysDictClass.hasObjectMethod('GetStateFromStateName'));
+        Debug::assert(sysDictClass.hasObjectMethod('TransitionTo'));
+
+        _document.selectForUpdate(true);
+        _document.reread();
+
+        targetState = sysDictClass.callObject('GetStateFromStateName', stateMachine, _stateMachineTargetStateName);
+        sysDictClass.callObject('TransitionTo', stateMachine, targetState);
+        
+        _document.update();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>invokeWorkflowEventHandler</Name>
+				<Source><![CDATA[
+    private server static void invokeWorkflowEventHandler(
+        WorkflowContext _workflowContext,
+        WorkflowEventCategory _eventCategory,
+        className _className)
+    {
+        WorkflowEventArgs eventArgs;
+        WorkflowStartedEventHandler workflowStartedEventHandler;
+        WorkflowCompletedEventHandler workflowCompletedEventHandler;
+        WorkflowCanceledEventHandler workflowCanceledEventHandler;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, invokeWorkflowEventHandler));
+
+        eventArgs = WorkflowEventArgs::newWorkflowEventArgs(_workflowContext);
+
+        // If no event handler is defined, move on successfully
+        if (strLen(_className) > 0)
+        {
+            switch (_eventCategory)
+            {
+                case WorkflowEventCategory::Cancelled:
+                    workflowCanceledEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowCanceledEventHandler)) as WorkflowCanceledEventHandler;
+                    using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), emptyGuid(), _className, classStr(WorkflowCanceledEventHandler)))
+                    {
+                        workflowCanceledEventHandler.canceled(eventArgs);
+                    }
+                    break;
+                case WorkflowEventCategory::Completed:
+                    workflowCompletedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowCompletedEventHandler)) as WorkflowCompletedEventHandler;
+                    using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), emptyGuid(), _className, classStr(WorkflowCompletedEventHandler)))
+                    {
+                        workflowCompletedEventHandler.completed(eventArgs);
+                    }
+                    break;
+                case WorkflowEventCategory::Started:
+                    workflowStartedEventHandler = SysWorkflowHelper::createInstance(_className, classNum(WorkflowStartedEventHandler)) as WorkflowStartedEventHandler;
+                    using (var task = PerformanceEventsAsIDisposable::WorkflowRuntime_WorkflowExecuteEventHandler(_workflowContext.parmWorkflowCorrelationId(), _workflowContext.parmParentCorrelationId(), _workflowContext.parmRootCorrelationId(), emptyGuid(), _className, classStr(WorkflowStartedEventHandler)))
+                    {
+                        workflowStartedEventHandler.started(eventArgs);
+                    }
+                    break;
+                default:
+                    throw error(strFmt("@SYS106837", enum2str(_eventCategory)));
+            }
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>queueMessages</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void queueMessages(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageCollection _messages)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage message;
+        System.Collections.IEnumerator enumerator;
+        WorkflowMessageLifeCycleState lifecycleState;
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+        ttsbegin;
+        // BP deviation documented
+        enumerator = _messages.GetEnumerator();
+        while (enumerator.MoveNext())
+        {
+            message = enumerator.get_Current();
+
+            lifecycleState = SysWorkflowConvert::toXppEnum(
+                'Microsoft.Dynamics.AX.Framework.Workflow.Runtime',
+                'Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageLifecycleState',
+                message.get_LifecycleState(),
+                'WorkflowMessageLifecycleState');
+
+            switch (lifecycleState)
+            {
+                case WorkflowMessageLifeCycleState::Queued:
+                    SysWorkflowQueue::enqueue(message);
+                    break;
+                case WorkflowMessageLifeCycleState::Dequeued:
+                    SysWorkflowQueue::dequeue(message);
+                    break;
+                default:
+                    throw error(strFmt("@SYS106834", enum2str(lifecycleState)));
+            }
+        }
+        ttscommit;
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>raiseElementEvent</Name>
+				<Source><![CDATA[
+    private server static void raiseElementEvent(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext _workflowContext,
+        SysWorkflowElement _sysWorkflowElement,
+        WorkflowTaskEventCategory _eventCategory,
+        WorkflowOutcomeName _outcome)
+    {
+        WorkflowContext workflowContext;
+        className className;
+        SysElementName stateMachineName;
+        SysElementName stateMachineTargetStateName;
+        SysWorkflowDocument sysWorkflowDocument;
+        boolean isCanceled = false;
+        #Workflow
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, raiseElementEvent));
+
+        if (_sysWorkflowElement.type() == WorkflowElementType::ManualGateway)
+        {
+            // non-AOT bound elments do not call event handlers
+            return;
+        }
+        
+        if (_outcome == #WorkflowActionCancelled)
+        {
+            isCanceled = true;
+            className = _sysWorkflowElement.canceledEventHandler();
+            stateMachineName = _sysWorkflowElement.canceledStateMachine();
+            stateMachineTargetStateName = _sysWorkflowElement.canceledStateMachineTargetState();
+
+            if (stateMachineName && !stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingTargetState', _sysWorkflowElement.name(), #WorkflowActionCancelled));
+            }
+
+            if (!stateMachineName && stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingStateMachine', _sysWorkflowElement.name(), #WorkflowActionCancelled));
+            }
+        }
+        else if (WorkflowTaskEventCategory::Started == _eventCategory)
+        {
+            className = _sysWorkflowElement.startedEventHandler();
+            stateMachineName = _sysWorkflowElement.startedStateMachine();
+            stateMachineTargetStateName = _sysWorkflowElement.startedStateMachineTargetState();
+
+            if (stateMachineName && !stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingTargetState', _sysWorkflowElement.name(), enum2str(_eventCategory)));
+            }
+
+            if (!stateMachineName && stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingStateMachine', _sysWorkflowElement.name(), enum2str(_eventCategory)));
+            }
+        }
+        else if (WorkflowTaskEventCategory::Execute == _eventCategory)
+        {
+            className = _sysWorkflowElement.executionEventHandler();
+            stateMachineName = _sysWorkflowElement.executionStateMachine();
+            stateMachineTargetStateName = _sysWorkflowElement.executionStateMachineTargetState();
+
+            if (stateMachineName && !stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingTargetState', _sysWorkflowElement.name(), enum2str(_eventCategory)));
+            }
+
+            if (!stateMachineName && stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingStateMachine', _sysWorkflowElement.name(), enum2str(_eventCategory)));
+            }
+        }
+        else
+        {
+            className = _sysWorkflowElement.outcomeEventHandler(_outcome);
+            stateMachineName = _sysWorkflowElement.outcomeStateMachine(_outcome);
+            stateMachineTargetStateName = _sysWorkflowElement.outcomeStateMachineTargetState(_outcome);
+
+            if (stateMachineName && !stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingOutcomeTargetState', _sysWorkflowElement.name(), _outcome));
+            }
+
+            if (!stateMachineName && stateMachineTargetStateName)
+            {
+                throw error(strfmt('@SYS:StateMachineMissingOutcomeStateMachine', _sysWorkflowElement.name(), _outcome));
+            }
+        }
+       
+        workflowContext = SysWorkflowConvert::toXppWorkflowContext(_workflowContext);
+        changecompany(SysWorkflowHelper::getCompanyId(workflowContext.parmCompanyId()))
+        {
+            if (stateMachineName && stateMachineTargetStateName)
+            {
+                sysWorkflowDocument = SysWorkflowDocument::newDocument(workflowContext, _sysWorkflowElement.templateName(), curuserid());
+                Debug::assert(null != sysWorkflowDocument);
+                SysWorkflowQueue::invokeStateTransition(sysWorkflowDocument.getDocument(), stateMachineName, stateMachineTargetStateName);
+            }
+            SysWorkflowQueue::invokeElementEventHandler(workflowContext, _sysWorkflowElement, _eventCategory, _outcome, className, isCanceled);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>raiseWorkflowEvent</Name>
+				<Source><![CDATA[
+    [Microsoft.Dynamics.BusinessPlatform.SharedTypes.InternalUseOnlyAttribute]
+    public server static void raiseWorkflowEvent(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext _workflowContext,
+        workflowTypeName _templateName,
+        WorkflowEventCategory _eventCategory)
+    {
+        WorkflowContext workflowContext;
+        SysDictWorkflowType dictTemplate;
+        className className;
+        SysElementName stateMachineName;
+        SysElementName stateMachineTargetStateName;
+        SysWorkflowDocument sysWorkflowDocument;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, raiseWorkflowEvent));
+
+        // Load the template from metadata
+        dictTemplate = new SysDictWorkflowType(_templateName);
+        if (dictTemplate == null)
+        {
+            throw error(strFmt("@SYS106830", _templateName));
+        }
+
+        switch (_eventCategory)
+        {
+            case WorkflowEventCategory::Cancelled:
+                className = dictTemplate.cancelledEventHandler();
+                stateMachineName = dictTemplate.canceledStateMachine();
+                stateMachineTargetStateName = dictTemplate.canceledStateMachineTargetState();
+
+                if (stateMachineName && !stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingTargetState', _templateName, enum2str(_eventCategory)));
+                }
+
+                if (!stateMachineName && stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingStateMachine', _templateName, enum2str(_eventCategory)));
+                }
+                break;
+            case WorkflowEventCategory::Completed:
+                className = dictTemplate.completedEventHandler();
+                stateMachineName = dictTemplate.completedStateMachine();
+                stateMachineTargetStateName = dictTemplate.completedStateMachineTargetState();
+
+                if (stateMachineName && !stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingTargetState', _templateName, enum2str(_eventCategory)));
+                }
+
+                if (!stateMachineName && stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingStateMachine', _templateName, enum2str(_eventCategory)));
+                }
+                break;
+            case WorkflowEventCategory::Started:
+                className = dictTemplate.startedEventHandler();
+                stateMachineName = dictTemplate.startedStateMachine();
+                stateMachineTargetStateName = dictTemplate.startedStateMachineTargetState();
+
+                if (stateMachineName && !stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingTargetState', _templateName, enum2str(_eventCategory)));
+                }
+
+                if (!stateMachineName && stateMachineTargetStateName)
+                {
+                    throw error(strfmt('@SYS:StateMachineWorkflowMissingStateMachine', _templateName, enum2str(_eventCategory)));
+                }
+                break;
+            default:
+                throw error(strFmt("@SYS106837", enum2str(_eventCategory)));
+        }
+
+        workflowContext = SysWorkflowConvert::toXppWorkflowContext(_workflowContext);
+        changecompany(SysWorkflowHelper::getCompanyId(workflowContext.parmCompanyId()))
+        {
+            if (stateMachineName && stateMachineTargetStateName)
+            {
+                sysWorkflowDocument = SysWorkflowDocument::newDocument(workflowContext, _templateName, curuserid());
+                Debug::assert(null != sysWorkflowDocument);
+                SysWorkflowQueue::invokeStateTransition(sysWorkflowDocument.getDocument(), stateMachineName, stateMachineTargetStateName);
+            }
+
+            SysWorkflowQueue::invokeWorkflowEventHandler(workflowContext, _eventCategory, className);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>resume</Name>
+				<Source><![CDATA[
+    private server static void resume(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message,
+        WorkflowInstanceId _instanceId,
+        WorkflowInstanceNumber _instanceNumber,
+        WorkflowUser _originator,
+        WorkflowSubmitOnBehalfUser _submitter)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.ActivityContext activityContext;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, resume));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        if (appl.ttsLevel() != 0)
+        {
+            throw error("@SYS109598");
+        }
+
+        activityContext = _message.get_ActivityContext();
+        activityContext.set_DomainUser(AxaptaUserManager::getWorkflowExecutionDomainAccount());
+
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowInstanceManager::Resume(
+            _message,
+            _instanceId,
+            _instanceNumber,
+            _originator,
+            _submitter,
+            System.Guid::NewGuid());
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>workflowCanceled</Name>
+				<Source><![CDATA[
+    private server static void workflowCanceled(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message,
+        boolean _isLineItemRecall = false,
+        List _notifications = null)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        WorkflowCorrelationId rootCorrelationId;
+        WorkflowCorrelationId workflowCorrelationId;
+        SysWorkflowTable workflowTable;
+        SysWorkflowNotificationContext notificationContext;
+        ListEnumerator notificationsEnumerator;
+        List notifications;
+        CLRObject tempClrObject;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, workflowCanceled));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        tempClrObject = _message.get_ActivityContext();
+        activityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext;
+        workflowContext = activityContext.get_WorkflowContext();
+        // BP deviation documented
+        rootCorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_RootCorrelationId());
+
+        if (_isLineItemRecall)
+        {
+            // BP deviation documented
+            workflowCorrelationId = CLRInterop::getAnyTypeForObject(workflowContext.get_WorkflowCorrelationId());
+
+            ttsbegin;
+            // get the sub-workflows in reverse order of creation
+            while select forupdate workflowTable
+            order by workflowTable.RecId desc
+            // BP deviation documented
+            where workflowTable.RootCorrelationId == rootCorrelationId &&
+                (workflowTable.ParentCorrelationId == workflowCorrelationId ||
+                workflowTable.WorkflowCorrelationId == workflowCorrelationId)
+            {
+                SysWorkflowQueue::internalCancel(workflowTable, _notifications, _message.get_User());
+
+                SysWorkflowTable::delete(workflowTable.WorkflowCorrelationId, false);
+                SysWorkflowQueue::clearMessages(workflowTable.WorkflowCorrelationId, false);
+                SysWorkflowWorkItem::clearWorkItems(workflowTable.WorkflowCorrelationId, false, true);
+            }
+            ttscommit;
+        }
+        else
+        {
+            notifications = new List(Types::Class);
+            ttsbegin;
+            // get the sub-workflows in reverse order of creation
+            while select forupdate workflowTable
+            order by workflowTable.RecId desc
+            // BP deviation documented
+            where workflowTable.RootCorrelationId == rootCorrelationId
+            {
+                SysWorkflowQueue::internalCancel(workflowTable, notifications, _message.get_User());
+            }
+
+            SysWorkflowTable::delete(rootCorrelationId, true);
+            SysWorkflowQueue::clearMessages(rootCorrelationId, true);
+            SysWorkflowWorkItem::clearWorkItems(rootCorrelationId, true);
+            ttscommit;
+
+            // send the notifications
+            notificationsEnumerator = notifications.getEnumerator();
+            while (notificationsEnumerator.moveNext())
+            {
+                notificationContext = notificationsEnumerator.current();
+                SysWorkflowHelper::sendNotifications(notificationContext);
+            }
+        }
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>workflowCompleted</Name>
+				<Source><![CDATA[
+    private server static void workflowCompleted(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage completedMessage;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext parentActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext parentWorkflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        SysWorkflowTable workflowTable;
+        SysWorkflowTable parentWorkflowTable;
+        WorkflowSubWorkflow subWorkflowTable;
+        WorkflowCorrelationId correlationId;
+        SysWorkflowNotificationContext notificationContext;
+        boolean isRoot;
+        CLRObject tempClrObject;
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, workflowCompleted));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        tempClrObject = _message.get_ActivityContext();
+        activityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext;
+        workflowContext = activityContext.get_WorkflowContext();
+
+        // populate the notification infomation before deleting the workflow
+        workflowTable = SysWorkflowTable::find(workflowContext.get_WorkflowCorrelationId());
+        if (!workflowTable)
+        {
+            throw error("@SYS116100");
+        }
+
+        ttsbegin;
+        SysWorkflowQueue::raiseWorkflowEvent(
+            workflowContext,
+            workflowTable.TemplateName,
+            WorkflowEventCategory::Completed);
+
+        // check if this is a root workflow
+        // BP deviation documented
+        correlationId = CLRInterop::getAnyTypeForObject(workflowContext.get_ParentCorrelationId());
+        if (correlationId == emptyGuid())
+        {
+            isRoot = true;
+            // clean-up workflow & sub-workflows
+            SysWorkflowTable::delete(workflowContext.get_RootCorrelationId(), isRoot);
+        }
+        else
+        {
+            isRoot = false;
+            // We don't clean-up the sub-workflows until the root completes - if the root is
+            // canceled we need to get the elements requiring compensation for each sub-workflow
+            // instance therefore we cannot delete the SysWorkflowTable here.
+
+            // check if the workflow is dependent
+            subWorkflowTable = WorkflowSubWorkflow::find(workflowContext.get_SubWorkflowId());
+            if (!subWorkflowTable)
+            {
+                throw error("@SYS116094");
+            }
+
+            if (subWorkflowTable.WaitForComplete)
+            {
+                // construct a workflow completed the message to send to the parent-workflow
+                parentWorkflowTable = SysWorkflowTable::find(workflowContext.get_ParentCorrelationId());
+                if (!parentWorkflowTable)
+                {
+                    throw error("@SYS116100");
+                }
+
+                // BP deviation documented
+                parentWorkflowContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext(
+                    parentWorkflowTable.ContextCompanyId,
+                    parentWorkflowTable.ContextTableId,
+                    parentWorkflowTable.ContextRecId,
+                    parentWorkflowTable.RootCorrelationId,
+                    parentWorkflowTable.ParentCorrelationId,
+                    parentWorkflowTable.WorkflowCorrelationId,
+                    parentWorkflowTable.SubWorkflowId);
+
+                // the correlation is for the waiting sub-workflow activity or line activity bookmark
+                // BP deviation documented
+                parentActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext(
+                    parentWorkflowTable.WorkflowCorrelationId,
+                    parentWorkflowTable.ConfigurationId,
+                    parentWorkflowContext);
+
+                // we are sending the message to the parent's sub-workflow bookmark which is
+                // child's workflow correlation id or the child's original correlation id (if the workflow was recalled/resubmitted)
+                if (workflowTable.OriginalCorrelationId == emptyGuid())
+                {
+                    parentActivityContext.set_Bookmark(workflowContext.get_WorkflowCorrelationId());
+                }
+                else
+                {
+                    parentActivityContext.set_Bookmark(workflowTable.OriginalCorrelationId);
+                }
+
+                // BP deviation documented
+                completedMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(parentActivityContext);
+                messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::AcknowledgeWorkflowCompleted);
+                completedMessage.set_MessageType(messageType);
+                SysWorkflowQueue::enqueue(completedMessage);
+            }
+        }
+        WorkflowTrackingTable::saveTracking(SysWorkflowTracking::newWorkflowCompleted(
+            activityContext, workflowTable, _message.get_User()));
+        SysWorkflowQueue::clearMessages(workflowContext.get_WorkflowCorrelationId(), isRoot);
+        SysWorkflowWorkItem::clearWorkItems(workflowContext.get_WorkflowCorrelationId(), isRoot);
+        ttscommit;
+
+        //log WF Instance compeleted event
+        WorkflowDiscreteEventWrapper::WriteEventWFInstanceCompleted ( workflowTable );
+
+        // note the SysWorkflowTable record has been deleted at this point
+        notificationContext = new SysWorkflowNotificationContext();
+        notificationContext.parmWorkflowContext(SysWorkflowConvert::toXppWorkflowContext(workflowContext));
+        notificationContext.parmNotificationId(workflowTable.ConfigurationId);
+        notificationContext.parmWorkflowInstanceNumber(workflowTable.InstanceNumber);
+        notificationContext.parmOriginator(workflowTable.Originator);
+        notificationContext.parmAction(enum2Symbol(enumNum(WorkflowConfigNotificationActionType), WorkflowConfigNotificationActionType::Completed));
+        notificationContext.parmNotificationLevel(WorkflowNotificationLevel::Workflow);
+        notificationContext.parmNotificationType(WorkflowNotificationType::Completed);
+        SysWorkflowHelper::sendNotifications(notificationContext);
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>workflowRecalled</Name>
+				<Source><![CDATA[
+    private server static void workflowRecalled(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContextCollection workItems;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext workflowActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext workItemActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext taskActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.StepActivityContext stepActivityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowUserContext userContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowStringCollection delegators;
+        WorkflowActivityInstanceId workItemId = newGuid();
+        WorkflowVersionTable versionTable;
+        SysWorkflowNotificationContext notificationContext;
+        List notifications = new List(Types::Class);
+        ListEnumerator notificationsEnumerator;
+        SysWorkflowUsers workflowUsers;
+        WorkflowUserList users;
+        CompanyId companyId;
+        int i;
+        ClrObject tempClrObject;
+
+        tempClrObject = _message.get_ActivityContext();
+        workflowActivityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext;
+        workflowContext = workflowActivityContext.get_WorkflowContext();
+
+        versionTable = WorkflowVersionTable::find(workflowActivityContext.get_ConfigurationId());
+        if (!versionTable)
+        {
+            throw error("@SYS111590");
+        }
+
+        // auto-delegate
+        users = WorkflowUserList::construct();
+        users.add(_message.get_User());
+
+        // BP deviation documented
+        companyId = CLRInterop::getAnyTypeForObject(workflowContext.get_CompanyId());
+        changecompany(SysWorkflowHelper::getCompanyId(companyId))
+        {
+            // delegation happens in this funtion
+            workflowUsers = SysWorkflowUsers::newSysWorkflowUsers(users, versionTable);
+        }
+        users = workflowUsers.getDelegators(1);
+
+        // BP deviation documented
+        userContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowUserContext(workflowUsers.getUser(1));
+        delegators = userContext.get_Delegators();
+        for (i = 1; i <= users.getCount(); i++)
+        {
+            delegators.Add(users.get(i));
+        }
+        // BP deviation documented
+        taskActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.TaskActivityContext(
+            workflowContext.get_SubWorkflowId(),
+            workflowActivityContext);
+        // BP deviation documented
+        stepActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.StepActivityContext(
+            workflowContext.get_SubWorkflowId(),
+            taskActivityContext);
+        // BP deviation documented
+        workItemActivityContext = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContext(
+            workItemId,
+            stepActivityContext,
+            userContext);
+        workItemActivityContext.set_WorkItemType(Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemType::Recall);
+        // BP deviation documented
+        workItems = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkItemActivityContextCollection();
+        workItems.Add(workItemActivityContext);
+
+        ttsbegin;
+        // create the work item
+        SysWorkflowWorkItem::createWorkItems(workItems);
+        SysWorkflowQueue::workflowCanceled(_message, true, notifications);
+        ttscommit;
+
+        // send the notifications
+        notificationsEnumerator = notifications.getEnumerator();
+        while (notificationsEnumerator.moveNext())
+        {
+            notificationContext = notificationsEnumerator.current();
+            SysWorkflowHelper::sendNotifications(notificationContext);
+        }
+    }
+
+]]></Source>
+			</Method>
+			<Method>
+				<Name>workflowStarted</Name>
+				<Source><![CDATA[
+    private server static void workflowStarted(
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage _message)
+    {
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage acknowledgementMessage;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext activityContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowContext workflowContext;
+        Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessageType messageType;
+        SysWorkflowTable workflowTable;
+        SysWorkflowTracking tracking;
+        SysWorkflowNotificationContext notificationContext;
+        CLRObject tempClrObject;
+        #Workflow
+
+        setPrefix(classStr(SysWorkflowQueue) + '-' + staticMethodStr(SysWorkflowQueue, workflowStarted));
+
+        new InteropPermission(InteropKind::ClrInterop).assert();
+
+        tempClrObject = _message.get_ActivityContext();
+        activityContext = tempClrObject as Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowActivityContext;
+        workflowContext = activityContext.get_WorkflowContext();
+
+        workflowTable = SysWorkflowTable::find(workflowContext.get_WorkflowCorrelationId());
+        if (!workflowTable)
+        {
+            throw error("@SYS116100");
+        }
+
+        tracking = SysWorkflowTracking::newWorkflowStarted(activityContext, workflowTable, _message.get_User());
+        // BP deviation documented
+        acknowledgementMessage = new Microsoft.Dynamics.AX.Framework.Workflow.Runtime.WorkflowMessage(activityContext);
+        messageType = SysWorkflowConvert::toMessageType(WorkflowMessageType::AcknowledgeWorkflowStarted);
+        acknowledgementMessage.set_MessageType(messageType);
+
+        ttsbegin;
+        SysWorkflowQueue::raiseWorkflowEvent(
+            workflowContext,
+            workflowTable.TemplateName,
+            WorkflowEventCategory::Started);
+
+        WorkflowTrackingTable::saveTracking(tracking);
+        SysWorkflowQueue::enqueue(acknowledgementMessage);
+        SysWorkflowQueue::dequeue(_message);
+        ttscommit;
+
+        // send the notifications
+        notificationContext = new SysWorkflowNotificationContext();
+        notificationContext.parmWorkflowContext(SysWorkflowConvert::toXppWorkflowContext(workflowContext));
+        notificationContext.parmNotificationId(workflowTable.ConfigurationId);
+        notificationContext.parmWorkflowInstanceNumber(workflowTable.InstanceNumber);
+        notificationContext.parmOriginator(workflowTable.Originator);
+        notificationContext.parmAction(enum2Symbol(enumNum(WorkflowConfigNotificationActionType), WorkflowConfigNotificationActionType::Started));
+        notificationContext.parmNotificationLevel(WorkflowNotificationLevel::Workflow);
+        notificationContext.parmNotificationType(WorkflowNotificationType::Started);
+        SysWorkflowHelper::sendNotifications(notificationContext);
+
+        CodeAccessPermission::revertAssert();
+    }
+
+]]></Source>
+			</Method>
+		</Methods>
+	</SourceCode>
+</AxClass>
