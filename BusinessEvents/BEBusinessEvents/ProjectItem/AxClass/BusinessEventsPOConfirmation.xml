@@ -32,7 +32,7 @@ class BusinessEventsPOConfirmation extends BusinessEventsBase
 
         // Only run if in the specified company and business events are enabled or if Business Events are enabled but not company specific.
         // Ensure that we don't have BODMAS issue here. Conditions may need to be turned around.
-        // ToDo: Remove company specific column, make company part of PK and adjust filter
+        // ToDo: Remove company specific column, make company part of PK and adjust filter. Test.
         if((BEConfiguration && BEConfiguration.Enabled && BEConfiguration.CompanySpecific && BEConfiguration.company == curExt()) || 
           (BEConfiguration && BEConfiguration.Enabled && !BEConfiguration.CompanySpecific)) 
         {
@@ -57,13 +57,16 @@ class BusinessEventsPOConfirmation extends BusinessEventsBase
         select vendPurchOrderJour where VendPurchOrderJour.PurchId == PurchTable.PurchId;
 
         // Header at the start of the list
-        Payload.addStart(VendPurchOrderJour);
+        Payload.addStart(VendPurchOrderJour);    
+
+        // ToDo: We need to handle those scenarios better in the generated JSON.                    
+        Payload.addEnd(purchTable);
 
         while select purchLineAllVersions where purchLineAllVersions.PurchId == vendPurchOrderJour.PurchId
         {
             // Add all other records at the end.
             Payload.addEnd(PurchLineAllVersions);
-        }
+        }        
     }
 
 ]]></Source>
